@@ -103,9 +103,12 @@ export function sparkline(w: Water, width = 300, height = 64): string {
 }
 
 // ---------- fetching ----------
+// The tile site caches files for a week: bump this when pipeline/build_flow.py output is republished, or browsers keep
+// the old shards (a stale, broken shard once left the panel empty).
+const DATA_VERSION = '2026-11-26';
 const cache = new Map<string, Promise<Record<string, unknown>>>();
 function shard(base: string, kind: 'flow' | 'water', id: number, shards: number): Promise<Record<string, unknown>> {
-  const url = `${base}v2/${kind}/${String(id % shards).padStart(3, '0')}.json`;
+  const url = `${base}v2/${kind}/${String(id % shards).padStart(3, '0')}.json?v=${DATA_VERSION}`;
   let p = cache.get(url);
   if (!p) {
     p = fetch(url).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
