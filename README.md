@@ -14,8 +14,8 @@ the well-studied ones. Satellites typically saw a band of water level only 0.66 
 
 Click any lake to read what is known: its published depth (with a link to the Wikidata item), a volume from the
 literature or a dam register, the band of level satellites have seen, or the model estimate. When a published depth
-does not fit the published volume, the panel says so. Search 125,597 named lakes by name; rivers with at least 5 m³/s
-of average flow are drawn underneath.
+does not fit the published volume, the panel says so. Search 125,597 named lakes and 6,765 named rivers by name;
+rivers with at least 5 m³/s of average flow are drawn underneath, and 7,026 of them carry their name on the map.
 
 The panel also answers two more questions:
 
@@ -27,6 +27,15 @@ The panel also answers two more questions:
   with one sentence comparing the first five years with the last five. Lakes that fill in wet years and dry out in
   between are described as such instead of being given a trend.
 
+Click a river to see the same kind of answer for it:
+
+- **What it is**: its name (and local name), its length from its farthest source, its average flow where it ends and the
+  area it drains, with the whole river drawn on the map and a link to its Wikidata item where one was found (3,141).
+- **Where it goes**: the river it flows into, and the sea or inland basin its water reaches (*Show the way to the sea*).
+- **What satellites have seen**: its width in Landsat images, and the range its water level moves over as measured by
+  the SWOT satellite since 2023 (5,173 rivers). At the spot you click, the panel asks NASA's Hydrocron service for that
+  stretch's SWOT measurements and draws every pass since July 2023.
+
 ![Lake Balkhash and Central Asia](docs/img/central-asia.png)
 
 | Finland: well documented | Northern Canada: mostly seen from space or modelled |
@@ -36,6 +45,10 @@ The panel also answers two more questions:
 | Geneva: its water reaches the Mediterranean through the Rhône | Narran: a lake that fills only in wet years |
 |---|---|
 | ![Geneva flow path](docs/img/flow-geneva.png) | ![Narran water record](docs/img/water-narran.png) |
+
+| Amu Darya: named, measured by SWOT, ending in the Aral Sea | Rhône: water level at Avignon, seen by SWOT |
+|---|---|
+| ![Amu Darya](docs/img/river-amudarya.png) | ![Rhone SWOT water level](docs/img/river-rhone-swot.png) |
 
 | The whole Earth | On a phone |
 |---|---|
@@ -58,6 +71,9 @@ data and code; the Global Surface Water Explorer shows water extent, not depth.
 | Rivers, flow at least 5 m³/s; downstream paths | [HydroRIVERS v1.0](https://www.hydrosheds.org/products/hydrorivers), Lehner and Grill (2013) | CC BY 4.0 |
 | Water volume by month since 1984 (22,367 lakes) | [GloLakes v1.1](https://doi.org/10.25914/K8ZF-6G46), Hou et al. (2024) Earth System Science Data 16, 201 | CC BY 4.0 |
 | Names of seas where rivers end | [Natural Earth](https://www.naturalearthdata.com) 1:10m marine areas | public domain |
+| River names, widths, SWOT water-level statistics | [SWORD v17c](https://doi.org/10.5281/zenodo.23870877), the SWOT River Database (Altenau et al. 2021); names from [OpenStreetMap](https://www.openstreetmap.org/copyright) | CC BY 4.0 (names © OpenStreetMap contributors, ODbL) |
+| River water level at a point, every SWOT pass | [PO.DAAC Hydrocron](https://podaac.github.io/hydrocron/), SWOT L2 HR River Single Pass (NASA/CNES), fetched live | open (NASA Earthdata) |
+| River translations and items | [Wikidata](https://www.wikidata.org) via [QLever](https://qlever.dev): rivers with articles in at least 5 languages | CC0 |
 | Background | NASA Blue Marble through GIBS | public domain |
 
 ## How it is built
@@ -80,6 +96,19 @@ Wikidata coordinates arrive as `POINT(lon lat)` for Earth; points on other bodie
 globe prefix and are skipped. Depths are read with their unit normalised to metres, and "mean" and "maximum" are told
 apart from the "criterion used" qualifier where it is given.
 
+`build_rivers.py` names the rivers. HydroRIVERS has a network but no names; SWORD has names (from OpenStreetMap) for
+rivers about 30 m wide or more. Each HydroRIVERS reach of at least 5 m³/s is matched at three points to the nearest SWORD
+reach within about 1.5 km whose drainage area agrees within a factor of three, and takes the name most points agree
+on. Names are compared without case, accents or words like "River" and "Rio". Spellings of one river are joined when
+SWORD often gives them to the same reach, when they follow each other downstream and nearly match ("Amudarya",
+"Amudaryo"), or when both are labels of the same Wikidata river ("Donau", "Danube"). A reach takes the name of the
+river below it when that name also continues up one of its branches (a confluence reach named after the tributary), a
+stretch between two parts of one river joins it (the Ob's "Sharap" stretch), nameless gaps such as reservoirs are filled
+when the same name continues below, and the name is carried up the biggest branch to the farthest source. Labels use
+one merged line per river. `build_search_rivers.py` writes the river search index, under both the name and the local
+name. The tile archive is rebuilt under a new name for each version (`lakes-atlas-v3/`), because the tile site lets
+browsers cache files for a week.
+
 ## Honest limits
 
 - A Wikidata depth can be wrong (Titicaca is recorded as 489 m without saying mean or maximum; the literature gives
@@ -90,6 +119,15 @@ apart from the "criterion used" qualifier where it is given.
 - River paths follow the river network, not the real hydrology of every lake: a terminal lake next to a river (the
   Narran Lakes, say) is drawn as draining into it, and 31,180 of the 264,517 lakes considered are more than about 2 km
   from any mapped river and get no path.
+- River names come from OpenStreetMap through SWORD and only for rivers about 30 m wide or more. Some big rivers are
+  still split or mislabelled: the Yenisei comes in three pieces, the Mekong in two, a stretch of the Amazon carries the
+  name of a tributary (Arapiuns), and delta branches are named as rivers of their own (the Danube "flows into" the
+  Kiliia branch).
+- River lengths are measured along HydroRIVERS from the farthest source the network reaches; they differ from textbook
+  lengths, which follow other conventions. River flows are modelled long-term averages (WaterGAP, 1971–2000), not gauge
+  readings.
+- SWOT water levels are heights above the geoid from single passes; doubtful passes (quality flag 2 or worse) and
+  heights far from the rest are dropped, but some noise remains.
 - GloLakes leaves out the largest lakes (the Caspian, the Great Lakes, Baikal and others), so they have no water
   record here. Its volumes come mostly from the lake's extent in Landsat images; the year-to-year ups and downs are
   more reliable than the absolute amount.
@@ -100,7 +138,7 @@ apart from the "criterion used" qualifier where it is given.
 npm install
 python3 scripts/tiles_server.py ../lakes-atlas-tiles 5401 & # the tile pieces with CORS (any static server will do)
 VITE_TILES=http://127.0.0.1:5401/ npx vite --port 5499
-npm test                                                     # depth evidence wording, consistency check, search, flow and water wording
+npm test                                                     # depth evidence wording, consistency check, search, flow, water and river wording
 ```
 
 Code: MIT. Part of [Bristlecone Lab](https://bristleconelab.org).

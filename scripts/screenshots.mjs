@@ -11,6 +11,8 @@ const shots = [
   { file: 'docs/img/globe.png', hash: '', size: [1440, 900], js: 'window.__lakes.map.jumpTo({ center: [40, 45], zoom: 2.3 })' },
   { file: 'docs/img/flow-geneva.png', hash: '#lake=1261@6.550,46.450,8.0', size: [1440, 900], js: "document.querySelector('#panel .btn-small').click()", settle: 2500 },
   { file: 'docs/img/water-narran.png', hash: '#lake=16471@147.400,-29.800,9.0', size: [1440, 900], js: "document.querySelector('#panel .more:last-of-type')?.scrollIntoView()" },
+  { file: 'docs/img/river-amudarya.png', hash: '#r=40278731', size: [1440, 900], settle: 2500 },
+  { file: 'docs/img/river-rhone-swot.png', hash: '#river=20527372@4.778,43.927,7.5', size: [1440, 900], js: "document.querySelector('#panel .level')?.scrollIntoView()", settle: 4000 },
   { file: 'docs/img/phone.png', hash: '#lake=78@-69.290,-15.910,6.5', size: [390, 844], mobile: true },
   { file: 'public/og-image.png', hash: '#lake=12@75.875,46.598,4.6', size: [1200, 630] },
 ];

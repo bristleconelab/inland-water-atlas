@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fold, prefixSearch, type SearchIndex } from '../src/search';
+import { fold, mergeHits, prefixSearch, riverSearch, type RiverIndex, type SearchIndex } from '../src/search';
 
 const ix: SearchIndex = {
   n: ['Caspian Sea', 'Superior', 'Lago Titicaca', 'Lac Léman', 'Little Superior Pond'],
@@ -13,5 +13,15 @@ describe('search', () => {
     expect(prefixSearch(ix, 'titic')[0]).toMatchObject({ id: 9, lon: -69.5, lat: -15.8 });
     expect(prefixSearch(ix, 'leman')[0].id).toBe(12);
     expect(prefixSearch(ix, 'x')).toEqual([]);
+  });
+});
+
+describe('lakes and rivers together', () => {
+  const rivers: RiverIndex = { n: ['Volga', 'Rhône', 'Superior River'], id: [1, 2, 3], x: [4500, 460, -8600], y: [5600, 4500, 4700], q: [8000, 1700, 20], km: [3500, 800, 60] };
+  it('finds rivers by name and ranks them with lakes', () => {
+    expect(riverSearch(rivers, 'rhone')[0]).toMatchObject({ id: 2, lon: 4.6, lat: 45 });
+    const m = mergeHits(prefixSearch(ix, 'sup'), riverSearch(rivers, 'sup'));
+    expect(m.map((h) => `${h.kind}:${h.id}`)).toEqual(['lake:5', 'river:3', 'lake:900']);
+    expect(mergeHits(prefixSearch(ix, 'lem'), riverSearch(rivers, 'rh'))[0].kind).toBe('river');
   });
 });

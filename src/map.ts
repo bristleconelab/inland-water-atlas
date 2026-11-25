@@ -6,6 +6,7 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { PMTiles, Protocol } from 'pmtiles';
 import { ChunkedSource, type ChunkedArchive } from './chunked';
 import { TIERS, type LakeProps } from './lake';
+import type { Reach } from './river';
 
 maplibregl.setWorkerUrl(workerUrl);
 const GIBS = 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief_Bathymetry/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg';
@@ -20,9 +21,12 @@ export const FLOW_COLOR = '#fff1b8';
 /** The vector tiles live in their own static site (lakes-atlas-tiles), cut into 2 MiB pieces: they change rarely and
  *  are far bigger than the app. VITE_TILES overrides the location (the dev setup serves them from localhost:5401). */
 export const TILES: string = import.meta.env.VITE_TILES ?? 'https://lakes-atlas-tiles.pages.dev/';
+/** Bump when the tile archive is rebuilt (pipeline/build_tiles.sh NAME). */
+const TILES_VERSION = 'v3';
 
 export async function createMap(container: HTMLElement): Promise<maplibregl.Map> {
-  const manifest = await fetch(`${TILES}manifest.json`).then((r) => r.json()) as Record<string, ChunkedArchive>;
+  // versioned: the tile site caches files for a week, and a new archive lives under a new folder (lakes-atlas-v3/)
+  const manifest = await fetch(`${TILES}manifest.json?v=${TILES_VERSION}`).then((r) => r.json()) as Record<string, ChunkedArchive>;
   const archive = manifest['lakes-atlas'];
   archive.base = new URL(archive.base, TILES).href;
   protocol.add(new PMTiles(new ChunkedSource(archive)));
@@ -35,7 +39,7 @@ export async function createMap(container: HTMLElement): Promise<maplibregl.Map>
     sky: { 'sky-color': '#0c1a24', 'horizon-color': '#24485a', 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.9, 5, 0.5, 7, 0] },
     sources: {
       earth: { type: 'raster', tiles: [GIBS], tileSize: 256, maxzoom: 8, attribution: 'Imagery: NASA Blue Marble via <a href="https://earthdata.nasa.gov/gibs">GIBS</a>' },
-      atlas: { type: 'vector', url: `pmtiles://${archive.base}`, attribution: 'Lakes: HydroLAKES, 3D-LAKES, Wikidata; rivers: HydroRIVERS' },
+      atlas: { type: 'vector', url: `pmtiles://${archive.base}`, attribution: 'Lakes: HydroLAKES, 3D-LAKES, Wikidata; rivers: HydroRIVERS, SWORD (names © OpenStreetMap contributors)' },
       selected: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
       flow: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
     },
@@ -65,6 +69,15 @@ export async function createMap(container: HTMLElement): Promise<maplibregl.Map>
       { id: 'flow-end', type: 'circle', source: 'flow', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 6, 'circle-color': FLOW_COLOR, 'circle-stroke-color': '#0c1a24', 'circle-stroke-width': 2 } },
       { id: 'selected', type: 'line', source: 'selected', paint: { 'line-color': SELECT_COLOR, 'line-width': 3 } },
       {
+        id: 'river-labels', type: 'symbol', source: 'atlas', 'source-layer': 'rivernames', minzoom: 2,
+        layout: {
+          'symbol-placement': 'line', 'symbol-spacing': 420, 'text-field': ['get', 'n'], 'text-font': ['Noto Sans Italic'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 3, ['-', 13, ['get', 'o']], 10, ['-', 16, ['*', 0.5, ['get', 'o']]]],
+          'text-letter-spacing': 0.06, 'text-max-angle': 60, 'symbol-sort-key': ['get', 'o'], 'text-padding': 6,
+        },
+        paint: { 'text-color': '#a9d3f5', 'text-halo-color': '#0c1a24', 'text-halo-width': 1.3 },
+      },
+      {
         id: 'labels', type: 'symbol', source: 'atlas', 'source-layer': 'labels',
         layout: {
           'text-field': ['get', 'name'], 'text-font': ['Noto Sans Italic'], 'text-size': ['interpolate', ['linear'], ['zoom'], 3, 11, 9, 14],
@@ -87,4 +100,12 @@ export function lakeAt(map: maplibregl.Map, point: maplibregl.PointLike): { prop
   const id = hit.properties.id as number;
   const parts = map.querySourceFeatures('atlas', { sourceLayer: 'lakes', filter: ['==', ['get', 'id'], id] });
   return { props: hit.properties as unknown as LakeProps, outline: parts.map((f) => ({ type: 'Feature', properties: {}, geometry: f.geometry })) };
+}
+
+/** The biggest river reach within a few pixels of a point (river lines are thin). */
+export function riverAt(map: maplibregl.Map, p: maplibregl.Point, r = 6): Reach | null {
+  const hits = map.queryRenderedFeatures([[p.x - r, p.y - r], [p.x + r, p.y + r]], { layers: ['rivers'] });
+  if (!hits.length) return null;
+  const best = hits.reduce((a, b) => ((b.properties.q as number) > (a.properties.q as number) ? b : a));
+  return best.properties as unknown as Reach;
 }

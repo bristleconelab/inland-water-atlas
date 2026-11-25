@@ -79,3 +79,6 @@ dialog p, dialog li { max-width: 68ch; } .sources li, dialog ul li { margin-bott
   body:has(#panel:not([hidden])) #key, body:has(#panel:not([hidden])) #hint { display: none; }
   #hint { bottom: 210px; }
 }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px; }
+.spark.level { color: #7fb6e8; }
+.more .link { display: block; margin: 2px 0 8px; }

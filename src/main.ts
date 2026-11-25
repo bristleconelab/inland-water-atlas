@@ -3,9 +3,10 @@ import '@fontsource-variable/source-serif-4';
 import './styles.css';
 import type { FilterSpecification, GeoJSONSource, Map as MlMap } from 'maplibre-gl';
 import { areaWords, depthCheck, evidence, KIND, TIERS, verdict, type LakeProps } from './lake';
-import { createMap, lakeAt, TILES } from './map';
+import { createMap, lakeAt, riverAt, TILES } from './map';
 import { decodePath, flowSentence, lakeFlow, lakeWater, sparkline, waterSummary } from './v2';
-import { prefixSearch, type SearchIndex } from './search';
+import { levelChart, levelSummary, riverEnd, riverFacts, riverLines, riverRecord, swotLevels, theRiver, type Reach, type River } from './river';
+import { mergeHits, prefixSearch, riverSearch, type RiverIndex, type SearchIndex } from './search';
 
 const $ = <T extends HTMLElement>(s: string) => document.querySelector(s) as T;
 const base = import.meta.env.BASE_URL;
@@ -18,10 +19,16 @@ let map: MlMap;
 async function start() {
   map = await createMap($('#map'));
   map.on('click', (e) => {
+    const at: [number, number] = [e.lngLat.lng, e.lngLat.lat];
     const hit = lakeAt(map, e.point);
-    if (hit) showLake(hit.props, hit.outline, [e.lngLat.lng, e.lngLat.lat]); else closePanel();
+    if (hit) return showLake(hit.props, hit.outline, at);
+    const reach = map.getLayoutProperty('rivers', 'visibility') === 'none' ? null : riverAt(map, e.point);
+    if (reach) showReach(reach, at); else closePanel();
   });
-  map.on('mousemove', (e) => { map.getCanvas().style.cursor = map.queryRenderedFeatures(e.point, { layers: ['lakes'] }).length ? 'pointer' : ''; });
+  map.on('mousemove', (e) => {
+    const on = map.queryRenderedFeatures(e.point, { layers: ['lakes'] }).length || riverAt(map, e.point, 4);
+    map.getCanvas().style.cursor = on ? 'pointer' : '';
+  });
   applyHash();
 }
 
@@ -38,7 +45,10 @@ document.querySelectorAll<HTMLInputElement>('input[data-tier]').forEach((cb) => 
   const f = ['in', ['get', 'tier'], ['literal', [...tiersOn]]] as unknown as FilterSpecification;
   map?.setFilter('lakes', f); map?.setFilter('lakes-edge', f);
 }));
-$<HTMLInputElement>('#rivers-on').addEventListener('change', (e) => map?.setLayoutProperty('rivers', 'visibility', (e.target as HTMLInputElement).checked ? 'visible' : 'none'));
+$<HTMLInputElement>('#rivers-on').addEventListener('change', (e) => {
+  const v = (e.target as HTMLInputElement).checked ? 'visible' : 'none';
+  for (const id of ['rivers', 'river-labels']) map?.setLayoutProperty(id, 'visibility', v);
+});
 
 // ---------- lake panel ----------
 function showLake(p: LakeProps, outline: GeoJSON.Feature[], at: [number, number]) {
@@ -73,7 +83,7 @@ function showLake(p: LakeProps, outline: GeoJSON.Feature[], at: [number, number]
     if (token !== shown || !f) return;
     flowBox.append(el('h3', '', 'Where its water goes'), el('p', '', flowSentence(f, p.n)));
     const pts = decodePath(f.p);
-    if (pts.length > 1) {
+    if (pts.length > 1 && f.km >= 1) { // a lake at the bottom of its own basin has no way to show
       const b = el('button', 'btn-small', 'Show the way') as HTMLButtonElement;
       b.addEventListener('click', () => {
         setFlow(pts);
@@ -96,6 +106,106 @@ function showLake(p: LakeProps, outline: GeoJSON.Feature[], at: [number, number]
   });
 }
 let shown = 0;
+
+// ---------- river panel ----------
+const RIVER_COLOR = '#7fb6e8';
+function showReach(reach: Reach, at: [number, number]) {
+  history.replaceState(null, '', `#river=${reach.id}@${at[0].toFixed(3)},${at[1].toFixed(3)},${map.getZoom().toFixed(1)}`);
+  openRiver(reach.r ?? null, reach, false);
+}
+/** A river by its id (r), or a nameless reach; `frame` fits the map to the whole river once it is loaded. */
+function openRiver(rid: number | null, reach: Reach | null, frame: boolean) {
+  hint.hidden = true;
+  body.replaceChildren();
+  setFlow(null);
+  setSelected([]);
+  const token = ++shown;
+  const badge = el('p', 'badge', 'River'); badge.style.background = RIVER_COLOR;
+  const title = el('h2', rid ? '' : 'unnamed', rid ? reach?.n ?? 'River' : 'River without a name');
+  const meta = el('p', 'meta'), verdictP = el('p', 'verdict'), ev = el('ol', 'evidence');
+  const wayBox = el('section', 'more'), levelBox = el('section', 'more'), links = el('p', 'links');
+  body.append(badge, title, meta, verdictP, ev, wayBox, levelBox, links);
+  panel.hidden = false;
+  if (reach) {
+    meta.textContent = `${fmt(Math.round(reach.q))} m³/s here on average (modelled)`;
+    links.append(el('span', 'fine', `HydroRIVERS reach ${reach.id}`));
+  }
+  if (rid) {
+    riverRecord(TILES, rid).then((r) => { if (token === shown && r) fillRiver(r, rid, title, meta, verdictP, ev, wayBox, reach, frame); });
+  } else {
+    verdictP.textContent = 'No name for this river was found on this map (names come from OpenStreetMap, for rivers about 30 m wide or more).';
+    if (reach?.d) riverRecord(TILES, reach.d).then((r) => {
+      if (token !== shown || !r) return;
+      verdictP.textContent = `No name for this stretch was found on this map. It flows into ${theRiver(r.n)}.`;
+      const b = el('button', 'btn-small', `Open ${theRiver(r.n)}`);
+      b.addEventListener('click', () => { history.replaceState(null, '', `#r=${reach.d}`); openRiver(reach.d!, null, true); });
+      wayBox.append(b);
+    });
+  }
+  if (reach?.s) {
+    levelBox.append(el('h3', '', 'Water level here, seen by SWOT'));
+    const wait = el('p', 'fine', 'Asking NASA for the measurements…');
+    levelBox.append(wait);
+    swotLevels(reach.s).then((pts) => {
+      if (token !== shown) return;
+      wait.remove();
+      if (pts == null) { levelBox.append(el('p', 'fine', 'The SWOT measurements could not be loaded just now. Try again later.')); return; }
+      const sum = levelSummary(pts);
+      if (!sum) { levelBox.append(el('p', 'fine', `SWOT has measured this stretch ${pts.length ? `only ${pts.length} times` : 'not yet, or not well enough'}.`)); return; }
+      levelBox.append(el('p', '', sum));
+      const chart = el('div', 'spark level'); chart.innerHTML = levelChart(pts); // numbers only (src/river.ts)
+      const axis = el('div', 'spark-axis');
+      const mo = (t: number) => new Date(t).toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+      axis.append(el('span', '', mo(pts[0].t)), el('span', '', mo(pts[pts.length - 1].t)));
+      levelBox.append(chart, axis, el('p', 'fine', 'Each dot is one pass of the SWOT satellite (NASA and CNES) over this stretch of river, from PO.DAAC Hydrocron. Doubtful passes are left out.'));
+    });
+  }
+}
+function fillRiver(r: River, rid: number, title: HTMLElement, meta: HTMLElement, verdictP: HTMLElement, ev: HTMLElement, wayBox: HTMLElement, reach: Reach | null, frame: boolean) {
+  title.textContent = r.n;
+  const local = r.l && r.l !== r.n ? `locally ${r.l}` : '';
+  meta.textContent = [local, `${fmt(r.km)} km long`, reach ? `${fmt(Math.round(reach.q))} m³/s here, ${fmt(Math.round(r.q))} m³/s at its end (modelled)` : `${fmt(Math.round(r.q))} m³/s at its end (modelled)`].filter(Boolean).join(', ');
+  verdictP.textContent = riverEnd(r);
+  for (const x of riverFacts(r)) {
+    const li = el('li', `ev ev-${x.kind}`);
+    li.append(el('h3', '', x.title), el('p', '', x.text));
+    ev.append(li);
+  }
+  const lines = riverLines(r);
+  setSelected(lines);
+  const all = el('button', 'btn-small', 'Show all of it');
+  all.addEventListener('click', () => fitTo(lines.flat()));
+  const row = el('p', 'btns'); row.append(all);
+  if (r.p) {
+    const way = decodePath(r.p);
+    const b = el('button', 'btn-small', 'Show the way to the sea');
+    if (r.endo) b.textContent = 'Show where its water ends';
+    b.addEventListener('click', () => { setFlow(way); fitTo([...lines.flat(), ...way]); });
+    row.append(b);
+  }
+  wayBox.append(row);
+  if (r.into && r.intoName) {
+    const b = el('button', 'link', `Open ${theRiver(r.intoName)}`);
+    b.addEventListener('click', () => { history.replaceState(null, '', `#r=${r.into}`); openRiver(r.into!, null, true); });
+    wayBox.append(b);
+  }
+  wayBox.append(el('p', 'fine', 'Name from OpenStreetMap through SWORD; length, flow and course from HydroRIVERS.'));
+  if (r.wd) {
+    const a = el('a', '', 'Wikidata item') as HTMLAnchorElement;
+    a.href = `https://www.wikidata.org/wiki/${r.wd}`; a.target = '_blank'; a.rel = 'noopener';
+    const lp = el('p', 'links'); lp.append(a); wayBox.append(lp);
+  }
+  if (!reach) history.replaceState(null, '', `#r=${rid}`);
+  if (frame) fitTo(lines.flat());
+}
+function setSelected(lines: [number, number][][]) {
+  (map?.getSource('selected') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: lines.length ? [{ type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: lines } }] : [] });
+}
+function fitTo(pts: [number, number][]) {
+  if (!pts.length) return;
+  const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+  map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: freeArea(), maxZoom: 9, duration: 1500 });
+}
 /** Padding that keeps a framed path clear of the title, the colour key and the lake panel (the river mouth of the
  *  Rhone ended up under the key with fixed padding). */
 function freeArea() {
@@ -137,22 +247,45 @@ function goToLake(id: number, lon: number, lat: number, zoom: number) {
 }
 function applyHash() {
   const m = /lake=(\d+)@(-?[\d.]+),(-?[\d.]+)(?:,([\d.]+))?/.exec(location.hash);
-  if (m) goToLake(Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4] ?? 9));
+  if (m) return goToLake(Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4] ?? 9));
+  const rv = /river=(\d+)@(-?[\d.]+),(-?[\d.]+)(?:,([\d.]+))?/.exec(location.hash);
+  if (rv) return goToReach(Number(rv[1]), Number(rv[2]), Number(rv[3]), Number(rv[4] ?? 8));
+  const r = /[#&]r=(\d+)/.exec(location.hash);
+  if (r) openRiver(Number(r[1]), null, true);
+}
+/** Fly to a clicked river reach (from a shared link) and open it once its tiles are on screen. */
+function goToReach(id: number, lon: number, lat: number, zoom: number) {
+  map.jumpTo({ center: [lon, lat], zoom });
+  map.once('idle', () => {
+    const f = map.querySourceFeatures('atlas', { sourceLayer: 'rivers', filter: ['==', ['get', 'id'], id] });
+    if (f.length) showReach(f[0].properties as unknown as Reach, [lon, lat]);
+  });
 }
 
 // ---------- search ----------
-let index: SearchIndex | null = null;
+let index: SearchIndex | null = null, rindex: RiverIndex | null = null;
 const input = $<HTMLInputElement>('#search'), hits = $<HTMLUListElement>('#hits');
-input.addEventListener('focus', async () => { index ??= await fetch(`${base}data/search.json`).then((r) => r.json()); }, { once: true });
+const loadIndexes = async () => {
+  [index, rindex] = await Promise.all([
+    index ?? fetch(`${base}data/search.json`).then((r) => r.json()),
+    rindex ?? fetch(`${base}data/search_rivers.json`).then((r) => r.json()).catch(() => ({ n: [], id: [], x: [], y: [], q: [], km: [] })),
+  ]);
+};
+input.addEventListener('focus', loadIndexes, { once: true });
 input.addEventListener('input', async () => {
-  index ??= await fetch(`${base}data/search.json`).then((r) => r.json());
-  const res = prefixSearch(index!, input.value, 8);
+  if (!index || !rindex) await loadIndexes();
+  const res = mergeHits(prefixSearch(index!, input.value, 8), riverSearch(rindex!, input.value, 8), 8);
   hits.replaceChildren();
   for (const r of res) {
     const li = el('li'); li.setAttribute('role', 'option');
-    const sw = el('span', 'sw'); sw.style.background = TIERS[r.tier as 1 | 2 | 3].color;
-    li.append(sw, el('span', 'hn', r.name), el('span', 'ha', areaWords(r.area)));
-    li.addEventListener('mousedown', (e) => { e.preventDefault(); hits.hidden = true; input.blur(); goToLake(r.id, r.lon, r.lat, zoomFor(r.area)); });
+    if (r.kind === 'lake') {
+      const sw = el('span', 'sw'); sw.style.background = TIERS[r.tier as 1 | 2 | 3].color;
+      li.append(sw, el('span', 'hn', r.name), el('span', 'ha', areaWords(r.area)));
+      li.addEventListener('mousedown', (e) => { e.preventDefault(); hits.hidden = true; input.blur(); goToLake(r.id, r.lon, r.lat, zoomFor(r.area)); });
+    } else {
+      li.append(el('span', 'sw riv'), el('span', 'hn', r.name), el('span', 'ha', `river, ${fmt(r.km)} km`));
+      li.addEventListener('mousedown', (e) => { e.preventDefault(); hits.hidden = true; input.blur(); history.replaceState(null, '', `#r=${r.id}`); openRiver(r.id, null, true); });
+    }
     hits.append(li);
   }
   hits.hidden = !res.length;
