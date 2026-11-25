@@ -3,7 +3,8 @@ import '@fontsource-variable/source-serif-4';
 import './styles.css';
 import type { FilterSpecification, GeoJSONSource, Map as MlMap } from 'maplibre-gl';
 import { areaWords, depthCheck, evidence, KIND, TIERS, verdict, type LakeProps } from './lake';
-import { createMap, lakeAt } from './map';
+import { createMap, lakeAt, TILES } from './map';
+import { decodePath, flowSentence, lakeFlow, lakeWater, sparkline, waterSummary } from './v2';
 import { prefixSearch, type SearchIndex } from './search';
 
 const $ = <T extends HTMLElement>(s: string) => document.querySelector(s) as T;
@@ -62,12 +63,63 @@ function showLake(p: LakeProps, outline: GeoJSON.Feature[], at: [number, number]
   const links = el('p', 'links');
   if (p.q) { const a = el('a', '', 'Wikidata item') as HTMLAnchorElement; a.href = `https://www.wikidata.org/wiki/${p.q}`; a.target = '_blank'; a.rel = 'noopener'; links.append(a); }
   links.append(el('span', 'fine', `HydroLAKES id ${p.id}`));
-  body.append(links);
+  const flowBox = el('section', 'more'), waterBox = el('section', 'more');
+  body.append(flowBox, waterBox, links);
   if (p.tier === 1) body.append(el('p', 'fine', 'Know a published depth for this lake? Adding it to the lake’s Wikidata item (with a source) will show it here after the next update.'));
   panel.hidden = false;
+  setFlow(null);
+  const token = ++shown;
+  lakeFlow(TILES, p.id).then((f) => {
+    if (token !== shown || !f) return;
+    flowBox.append(el('h3', '', 'Where its water goes'), el('p', '', flowSentence(f, p.n)));
+    const pts = decodePath(f.p);
+    if (pts.length > 1) {
+      const b = el('button', 'btn-small', 'Show the way') as HTMLButtonElement;
+      b.addEventListener('click', () => {
+        setFlow(pts);
+        const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+        map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: freeArea(), maxZoom: 9, duration: 1500 });
+      });
+      flowBox.append(b, el('p', 'fine', 'Along HydroRIVERS, from where the lake drains, simplified to about 2 km.'));
+    }
+  });
+  lakeWater(TILES, p.id).then((w) => {
+    if (token !== shown || !w) return;
+    const sum = waterSummary(w);
+    waterBox.append(el('h3', '', 'How its water changed'));
+    if (sum) waterBox.append(el('p', '', sum.words));
+    const chart = el('div', 'spark');
+    chart.innerHTML = sparkline(w); // built from numbers only (src/v2.ts)
+    const axis = el('div', 'spark-axis');
+    axis.append(el('span', '', String(w.y0)), el('span', '', String(w.y0 + w.v.length - 1)));
+    waterBox.append(chart, axis, el('p', 'fine', 'Water volume by year, estimated mostly from the lake’s extent in Landsat images (GloLakes). Trust the ups and downs more than the exact amount.'));
+  });
+}
+let shown = 0;
+/** Padding that keeps a framed path clear of the title, the colour key and the lake panel (the river mouth of the
+ *  Rhone ended up under the key with fixed padding). */
+function freeArea() {
+  const gap = 30;
+  const top = (document.querySelector('.masthead')?.getBoundingClientRect().bottom ?? 0) + gap;
+  if (matchMedia('(max-width: 760px)').matches) return { top, left: gap, right: gap, bottom: innerHeight * 0.6 };
+  const key = document.getElementById('key')?.getBoundingClientRect();
+  const left = (key && key.height ? key.right : 0) + gap;
+  const right = innerWidth - panel.getBoundingClientRect().left + gap;
+  return { top, left, right, bottom: gap };
+}
+function setFlow(pts: [number, number][] | null) {
+  const src = map?.getSource('flow') as GeoJSONSource | undefined;
+  if (!src) return;
+  if (!pts) { src.setData({ type: 'FeatureCollection', features: [] }); return; }
+  src.setData({ type: 'FeatureCollection', features: [
+    { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: pts } },
+    { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: pts[pts.length - 1] } },
+  ] });
 }
 function closePanel() {
   panel.hidden = true;
+  shown++;
+  setFlow(null);
   (map?.getSource('selected') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: [] });
   history.replaceState(null, '', location.pathname);
 }

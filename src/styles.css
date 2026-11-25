@@ -57,6 +57,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ev h3 { margin: 0 0 2px; font-size: 14px; letter-spacing: 0.01em; }
 .ev p { margin: 0; font-size: 14.5px; }
 .warn { margin: 0 0 12px; padding: 9px 12px; border-radius: 10px; background: rgb(255 93 143 / 0.12); border: 1px solid rgb(255 93 143 / 0.45); font-size: 14px; }
+.more:empty { display: none; }
+.more { margin: 0 0 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.more h3 { margin: 0 0 4px; font-size: 16px; }
+.more p { margin: 0 0 8px; }
+.btn-small { border: 0; border-radius: 16px; padding: 6px 14px; background: #fff1b8; color: #10202a; font-weight: 650; font-size: 14px; margin: 2px 0 8px; }
+.spark { color: var(--t2); background: rgb(238 243 245 / 0.04); border-radius: 10px; padding: 4px 6px 0; }
+.spark-axis { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin: 2px 4px 6px; }
 .links { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
 
 dialog { max-width: 640px; width: calc(100vw - 32px); max-height: 84vh; border: 1px solid var(--line); border-radius: 18px; padding: 26px 28px; color: var(--ink); background: var(--night-2); }

@@ -14,6 +14,8 @@ const protocol = new Protocol();
 maplibregl.addProtocol('pmtiles', protocol.tile);
 
 export const SELECT_COLOR = '#ff5d8f';
+/** The way the water goes: a light, dashed line that reads on both rivers and land. */
+export const FLOW_COLOR = '#fff1b8';
 
 /** The vector tiles live in their own static site (lakes-atlas-tiles), cut into 2 MiB pieces: they change rarely and
  *  are far bigger than the app. VITE_TILES overrides the location (the dev setup serves them from localhost:5401). */
@@ -35,6 +37,7 @@ export async function createMap(container: HTMLElement): Promise<maplibregl.Map>
       earth: { type: 'raster', tiles: [GIBS], tileSize: 256, maxzoom: 8, attribution: 'Imagery: NASA Blue Marble via <a href="https://earthdata.nasa.gov/gibs">GIBS</a>' },
       atlas: { type: 'vector', url: `pmtiles://${archive.base}`, attribution: 'Lakes: HydroLAKES, 3D-LAKES, Wikidata; rivers: HydroRIVERS' },
       selected: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+      flow: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
     },
     layers: [
       { id: 'bg', type: 'background', paint: { 'background-color': '#0c1a24' } },
@@ -57,6 +60,9 @@ export async function createMap(container: HTMLElement): Promise<maplibregl.Map>
         },
       },
       { id: 'lakes-edge', type: 'line', source: 'atlas', 'source-layer': 'lakes', minzoom: 7, paint: { 'line-color': '#0c1a24', 'line-width': 0.4, 'line-opacity': 0.5 } },
+      { id: 'flow-glow', type: 'line', source: 'flow', filter: ['==', ['geometry-type'], 'LineString'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': FLOW_COLOR, 'line-width': 7, 'line-opacity': 0.25, 'line-blur': 3 } },
+      { id: 'flow', type: 'line', source: 'flow', filter: ['==', ['geometry-type'], 'LineString'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': FLOW_COLOR, 'line-width': 2.4, 'line-dasharray': [2, 1.5] } },
+      { id: 'flow-end', type: 'circle', source: 'flow', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 6, 'circle-color': FLOW_COLOR, 'circle-stroke-color': '#0c1a24', 'circle-stroke-width': 2 } },
       { id: 'selected', type: 'line', source: 'selected', paint: { 'line-color': SELECT_COLOR, 'line-width': 3 } },
       {
         id: 'labels', type: 'symbol', source: 'atlas', 'source-layer': 'labels',
