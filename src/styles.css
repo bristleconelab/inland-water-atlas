@@ -1,0 +1,74 @@
+/* Lake Atlas. Dark, desaturated land so the lakes carry the picture; yellow = published, cyan = seen from space,
+   pale lilac = model only. Bricolage for the interface, Source Serif for the per-lake sentences. */
+:root {
+  --night: #0c1a24; --night-2: #13242f; --ink: #eef3f5; --muted: #9db0ba; --line: rgb(238 243 245 / 0.13);
+  --t3: #ffd166; --t2: #4cc9f0; --t1: #c8c3d9; --sel: #ff5d8f;
+  --sans: 'Bricolage Grotesque Variable', system-ui, sans-serif; --serif: 'Source Serif 4 Variable', Georgia, serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--night); }
+body { font: 15px/1.5 var(--sans); color: var(--ink); }
+a { color: var(--t2); text-underline-offset: 2px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--t3); outline-offset: 2px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.fine { font-size: 12.5px; color: var(--muted); }
+#map { position: fixed; inset: 0; }
+.maplibregl-ctrl-attrib { font: 11px var(--sans); }
+
+.masthead { position: fixed; top: 16px; left: 18px; z-index: 4; width: min(380px, calc(100vw - 36px)); }
+.masthead h1 { margin: 0; font-size: 38px; line-height: 0.95; font-weight: 800; letter-spacing: -0.035em; font-variation-settings: 'wdth' 78, 'opsz' 96; text-shadow: 0 2px 14px rgb(0 0 0 / 0.5); }
+.sub { margin: 6px 0 12px; color: var(--muted); }
+.search { position: relative; }
+#search { width: 100%; height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 22px; background: rgb(19 36 47 / 0.92); color: var(--ink); font: 16px var(--sans); }
+#search::placeholder { color: #8098a5; }
+#hits { position: absolute; top: 50px; left: 0; right: 0; margin: 0; padding: 6px; list-style: none; background: var(--night-2); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 14px 34px rgb(0 0 0 / 0.45); }
+#hits li { display: grid; grid-template-columns: 12px 1fr auto; gap: 10px; align-items: center; padding: 7px 8px; border-radius: 9px; cursor: pointer; }
+#hits li:hover { background: rgb(238 243 245 / 0.07); }
+.hn { font-weight: 600; } .ha { font-size: 12.5px; color: var(--muted); }
+.sw { width: 12px; height: 12px; border-radius: 4px; flex: none; }
+.t3 { background: var(--t3); } .t2 { background: var(--t2); } .t1 { background: var(--t1); opacity: 0.75; }
+.sw.riv { height: 3px; border-radius: 2px; background: #7fb6e8; }
+
+#key { position: fixed; left: 18px; bottom: 18px; z-index: 4; width: min(360px, calc(100vw - 36px)); padding: 14px 16px 12px; border-radius: 16px; background: rgb(19 36 47 / 0.9); border: 1px solid var(--line); backdrop-filter: blur(8px); }
+#headline { margin: 0 0 10px; font-family: var(--serif); font-size: 16px; line-height: 1.5; }
+.tiers { list-style: none; margin: 0 0 6px; padding: 10px 0 0; border-top: 1px solid var(--line); display: grid; gap: 7px; font-size: 14px; }
+.tiers label { display: flex; align-items: flex-start; gap: 9px; cursor: pointer; line-height: 1.3; }
+.tiers input { margin: 2px 0 0; accent-color: var(--t3); }
+.tiers .sw { margin-top: 3px; }
+.cnt { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
+.link { border: 0; background: none; padding: 0; color: var(--t2); text-decoration: underline; font-size: 13.5px; }
+
+#hint { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 3; margin: 0; padding: 8px 16px; border-radius: 20px; background: rgb(12 26 36 / 0.8); color: var(--muted); pointer-events: none; }
+
+#panel { position: fixed; z-index: 5; top: 14px; right: 14px; width: 380px; max-height: calc(100vh - 28px); display: flex; flex-direction: column; border-radius: 18px; background: var(--night-2); border: 1px solid var(--line); box-shadow: 0 18px 48px rgb(0 0 0 / 0.5); }
+.panel-body { overflow-y: auto; padding: 20px 22px; }
+.close { position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; border: 0; border-radius: 50%; background: rgb(238 243 245 / 0.08); font-size: 20px; line-height: 1; }
+.badge { display: inline-block; margin: 0; padding: 2px 10px; border-radius: 10px; font-size: 12.5px; font-weight: 650; color: #10202a; }
+#panel h2 { margin: 6px 40px 4px 0; font-size: 30px; line-height: 1.05; letter-spacing: -0.025em; font-variation-settings: 'wdth' 82, 'opsz' 96; }
+#panel h2.unnamed { color: var(--muted); font-weight: 600; }
+.meta { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
+.verdict { margin: 0 0 14px; font-family: var(--serif); font-size: 16.5px; line-height: 1.55; }
+.evidence { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 10px; }
+.ev { padding: 10px 12px; border-radius: 12px; background: rgb(238 243 245 / 0.05); border-left: 4px solid var(--t1); }
+.ev-published { border-left-color: var(--t3); } .ev-seen { border-left-color: var(--t2); }
+.ev h3 { margin: 0 0 2px; font-size: 14px; letter-spacing: 0.01em; }
+.ev p { margin: 0; font-size: 14.5px; }
+.warn { margin: 0 0 12px; padding: 9px 12px; border-radius: 10px; background: rgb(255 93 143 / 0.12); border: 1px solid rgb(255 93 143 / 0.45); font-size: 14px; }
+.links { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+
+dialog { max-width: 640px; width: calc(100vw - 32px); max-height: 84vh; border: 1px solid var(--line); border-radius: 18px; padding: 26px 28px; color: var(--ink); background: var(--night-2); }
+dialog::backdrop { background: rgb(0 0 0 / 0.55); }
+dialog h2 { margin: 0 0 8px; font-size: 26px; } dialog h3 { margin: 18px 0 6px; font-size: 16px; }
+dialog p, dialog li { max-width: 68ch; } .sources li, dialog ul li { margin-bottom: 6px; }
+
+@media (max-width: 760px) {
+  .masthead h1 { font-size: 30px; } .sub { display: none; }
+  #key { bottom: 10px; left: 10px; right: 10px; width: auto; padding: 10px 12px; }
+  #headline { font-size: 14px; } .tiers .fine { display: none; }
+  #panel { top: auto; bottom: 0; left: 0; right: 0; width: auto; max-height: 60vh; border-radius: 18px 18px 0 0; }
+  body:has(#panel:not([hidden])) #key, body:has(#panel:not([hidden])) #hint { display: none; }
+  #hint { bottom: 210px; }
+}

@@ -1,0 +1,38 @@
+{
+ "lakes": 1427688,
+ "published": 14110,
+ "seen": 501654,
+ "modelled": 911924,
+ "volSrc": {
+  "1": 266,
+  "2": 6723,
+  "3": 1420699
+ },
+ "wikidataDepth": 7616,
+ "named": 125597,
+ "seenMedianM": 0.6593418121337109,
+ "areaShareKnown": 0.5784301360391575,
+ "byAreaClass": {
+  "0.1-1 km2": {
+   "n": 1242507,
+   "published": 5452
+  },
+  "1-10 km2": {
+   "n": 168492,
+   "published": 5535
+  },
+  "10-100 km2": {
+   "n": 14981,
+   "published": 2277
+  },
+  ">=100 km2": {
+   "n": 1708,
+   "published": 846
+  }
+ },
+ "sources": {
+  "hydrolakes": "Messager et al. 2016, HydroLAKES v1.0, CC BY 4.0",
+  "3dlakes": "Huang et al. 2025, 3D-LAKES, Zenodo 10.5281/zenodo.13107867, CC BY 4.0",
+  "wikidata": "Wikidata via QLever, CC0, fetched 2026-11-25"
+ }
+}

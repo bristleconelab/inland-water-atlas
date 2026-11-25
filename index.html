@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Lake Atlas: how deep is this lake, and how do we know?</title>
+  <meta name="description" content="1.4 million lakes on one map, coloured by what we actually know about their depth: published, seen from space, or only a model's estimate. Click any lake.">
+  <meta name="theme-color" content="#0c1a24">
+  <link rel="canonical" href="https://lakes.bristleconelab.org/">
+  <meta property="og:title" content="Lake Atlas">
+  <meta property="og:description" content="How deep is this lake, and how do we know? For two thirds of the world's lakes, only a model knows.">
+  <meta property="og:url" content="https://lakes.bristleconelab.org/">
+  <meta property="og:image" content="https://lakes.bristleconelab.org/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230c1a24'/%3E%3Cpath d='M6 19c3-6 8-9 13-7s5 7 1 9-10 3-14-2z' fill='%23ffd166'/%3E%3C/svg%3E">
+</head>
+<body>
+  <div id="map" aria-label="Map of the world's lakes. Click a lake to see how deep it is and how we know."></div>
+
+  <header class="masthead">
+    <h1>Lake Atlas</h1>
+    <p class="sub">How deep is this lake, and how do we know?</p>
+    <div class="search" role="search">
+      <label for="search" class="visually-hidden">Find a lake</label>
+      <input id="search" type="search" autocomplete="off" spellcheck="false" placeholder="Find a lake: Baikal, Titicaca, Aral…" role="combobox" aria-expanded="false" aria-controls="hits">
+      <ul id="hits" role="listbox" hidden></ul>
+    </div>
+  </header>
+
+  <section id="key" aria-labelledby="key-title">
+    <h2 id="key-title" class="visually-hidden">What the colours mean</h2>
+    <p id="headline">Loading…</p>
+    <ul class="tiers">
+      <li><label><input type="checkbox" data-tier="3" checked><span class="sw t3"></span><span><b>Depth published</b> <span class="cnt" id="c3"></span><br><span class="fine">measured and written down</span></span></label></li>
+      <li><label><input type="checkbox" data-tier="2" checked><span class="sw t2"></span><span><b>Seen from space</b> <span class="cnt" id="c2"></span><br><span class="fine">satellites saw the water level move</span></span></label></li>
+      <li><label><input type="checkbox" data-tier="1" checked><span class="sw t1"></span><span><b>Model only</b> <span class="cnt" id="c1"></span><br><span class="fine">depth is a statistical estimate</span></span></label></li>
+      <li><label><input type="checkbox" id="rivers-on" checked><span class="sw riv"></span><span>Rivers</span></label></li>
+    </ul>
+    <button id="about-open" class="link">How this map was made</button>
+  </section>
+
+  <aside id="panel" hidden aria-live="polite">
+    <button class="close" aria-label="Close">×</button>
+    <div class="panel-body"></div>
+  </aside>
+
+  <p id="hint">Click any lake</p>
+
+  <dialog id="about" aria-labelledby="about-title">
+    <button class="close" aria-label="Close">×</button>
+    <h2 id="about-title">How this map was made</h2>
+    <p>Every lake of at least 10 hectares (1,427,688 of them) comes from HydroLAKES. For almost all of them, the depth and volume in that database, and in most maps and models that use it, are estimated from the lake's size and the slope of the land around it. This atlas sorts every lake by the best evidence there is for its depth:</p>
+    <ul>
+      <li><b>Depth published:</b> HydroLAKES took the volume from the scientific literature (266 lakes) or from the dam register GRanD (6,723 reservoirs), or a depth is recorded on Wikidata from published sources (7,616 lakes, matched when the Wikidata point lies inside the lake).</li>
+      <li><b>Seen from space:</b> 3D-LAKES traced how the shoreline moved as the water rose and fell, with ICESat-2 laser heights and Landsat images. That shows the shape of the top of the lake bed, typically a band 0.66 m high; the rest of the depth is still extrapolated.</li>
+      <li><b>Model only:</b> neither of the above.</li>
+    </ul>
+    <h3>Sources</h3>
+    <ul class="sources">
+      <li>Lakes: <a href="https://www.hydrosheds.org/products/hydrolakes">HydroLAKES v1.0</a>, Messager et al. (2016) Nature Communications (CC BY 4.0).</li>
+      <li>Seen from space: <a href="https://doi.org/10.5281/zenodo.13107867">3D-LAKES</a>, Huang et al. (2025) Scientific Data (CC BY 4.0).</li>
+      <li>Names and published depths: <a href="https://www.wikidata.org">Wikidata</a> (CC0), queried through <a href="https://qlever.dev">QLever</a>.</li>
+      <li>Rivers with an average flow of at least 5 m³/s: <a href="https://www.hydrosheds.org/products/hydrorivers">HydroRIVERS v1.0</a>, Lehner and Grill (2013) (CC BY 4.0).</li>
+      <li>Background: NASA Blue Marble through <a href="https://earthdata.nasa.gov/gibs">GIBS</a> (public domain).</li>
+    </ul>
+    <h3>What to keep in mind</h3>
+    <p>A Wikidata depth can be wrong or can belong to a nearby water body; each lake links to its item so it can be checked and corrected there. Satellite and model depths are averages over the lake, not soundings.</p>
+    <p>Code: <a href="https://github.com/bristleconelab/lakes-atlas">github.com/bristleconelab/lakes-atlas</a> (MIT). From <a href="https://bristleconelab.org">Bristlecone Lab</a>; see also <a href="https://oceanlife.bristleconelab.org">Ocean Life Atlas</a>, <a href="https://underworld.bristleconelab.org">Underworld</a> and <a href="https://seaflooratlas.org">Seafloor Atlas</a>.</p>
+  </dialog>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

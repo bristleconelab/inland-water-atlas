@@ -1,0 +1,29 @@
+{
+  "name": "lakes-atlas",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "How deep is this lake, and how do we know? 1.4 million lakes: published, seen by satellite, or only modelled.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fontsource-variable/bricolage-grotesque": "5.3.0",
+    "@fontsource-variable/source-serif-4": "5.3.1",
+    "maplibre-gl": "6.18.0",
+    "pmtiles": "4.5.0"
+  },
+  "devDependencies": {
+    "@types/geojson": "7946.0.16",
+    "@types/node": "24.10.1",
+    "playwright-core": "1.64.1",
+    "typescript": "6.0.3",
+    "vite": "8.3.8",
+    "vitest": "5.0.5"
+  }
+}
