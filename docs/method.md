@@ -78,3 +78,46 @@ WaterGAP 1971-2000 means in HydroRIVERS.
 PO.DAAC Hydrocron, SWOT L2 HR River Single Pass, for the SWORD reach SWOT has measured most often near the clicked
 HydroRIVERS reach: passes with `reach_q` above 1, `ice_clim_f` 2, or `wse_u` above 1 m are dropped, and so are heights
 more than max(10 MAD, 10 m) from the median. Heights are above the EGM2008 geoid.
+
+## Limits
+
+- A Wikidata depth can be wrong (Titicaca is recorded as 489 m without saying mean or maximum; the literature gives
+  about 280 m at the deepest; the panel now flags it) or can belong to a nearby water body. Each lake links to its item
+  so it can be checked.
+- 3D-LAKES "seen" means the shape of the top of the bed over the range the water level moved; the full depth is still
+  extrapolated.
+- HydroLAKES outlines date from around 2000 (the Aral Sea is drawn larger than today).
+- River paths follow the river network, not the real hydrology of every lake: a terminal lake next to a river (the
+  Narran Lakes, say) is drawn as draining into it, and 31,180 of the 264,517 lakes considered are more than about 2 km
+  from any mapped river and get no path.
+- River names come from OpenStreetMap through SWORD and only for rivers about 30 m wide or more. Some rivers are still
+  split or mislabelled (a stretch of the Amazon carries the name of a tributary, Arapiuns), and delta branches are
+  named as rivers of their own (the Danube "flows into" the Kiliia branch).
+- River lengths are measured along HydroRIVERS from the farthest source the network reaches; they differ from textbook
+  lengths, which follow other conventions. River flows are modelled long-term averages (WaterGAP, 1971–2000), not gauge
+  readings, and they do not take out what dams and irrigation use: far less reaches the Aral Sea through the Amu Darya
+  than the panel's number.
+- SWOT water levels are heights above the EGM2008 geoid from single passes. Passes with quality flag 2 or worse, over
+  ice, or with an uncertainty over 1 m are dropped, and so are heights both more than 10 median absolute deviations and
+  more than 10 m from the rest (a bank or a bridge); real floods of several metres stay in. Some noise remains. SWORD's
+  own per-stretch level range is not shown: it includes poor passes (6.7 m for the Rhône, against 0.5 m in the
+  filtered passes at Avignon).
+- Catchment outlines are made of HydroBASINS level-8 units, a few hundred km² each, so they are rough near the outlet,
+  and a big lake with several inflows shows the catchment of the unit at its outlet only (the Caspian's outline is the
+  Volga's; its area, 1.4 million km², is HydroLAKES' own and complete).
+- GLOBathy is itself a model; for 44 lakes it uses a published maximum depth, and those are left out of the model
+  error figures.
+- GloLakes leaves out the largest lakes (the Caspian, the Great Lakes, Baikal and others), so they have no water
+  record here. Its volumes come mostly from the lake's extent in Landsat images; the year-to-year ups and downs are
+  more reliable than the absolute amount.
+
+## Running it locally
+
+```sh
+npm install
+python3 scripts/tiles_server.py ../lakes-atlas-tiles 5401 & # the tile pieces with CORS (any static server will do)
+VITE_TILES=http://127.0.0.1:5401/ npx vite --port 5499
+npm test                                                     # depth evidence and checks, search, flow, water and river wording, SWOT filtering
+```
+
+The pipeline runs on a Linux server from the project data folder; each `pipeline/*.py` says how to run it in its docstring.

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://inlandwater.bristleconelab.org/sitemap.xml

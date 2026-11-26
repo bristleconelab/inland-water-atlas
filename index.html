@@ -11,14 +11,67 @@
   <meta property="og:description" content="How deep is this lake, and how do we know? For two thirds of the world's lakes, only a model knows.">
   <meta property="og:url" content="https://inlandwater.bristleconelab.org/">
   <meta property="og:image" content="https://inlandwater.bristleconelab.org/og-image.png">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Inland Water Atlas">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Inland Water Atlas: the Amazon river network on a satellite image">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230c1a24'/%3E%3Cpath d='M6 19c3-6 8-9 13-7s5 7 1 9-10 3-14-2z' fill='%23ffd166'/%3E%3C/svg%3E">
+  <meta name="twitter:title" content="Inland Water Atlas">
+  <meta name="twitter:description" content="1.4 million lakes and 7,000 rivers on one map: what is measured, seen from space, or only modelled.">
+  <meta name="twitter:image" content="https://inlandwater.bristleconelab.org/og-image.png">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebApplication",
+        "@id": "https://inlandwater.bristleconelab.org/#app",
+        "name": "Inland Water Atlas",
+        "url": "https://inlandwater.bristleconelab.org/",
+        "description": "A map of 1.4 million lakes and 7,000 named rivers that shows how each lake's depth is known: measured, seen from space, or only modelled. Lake water since 1984, where the water goes and where it comes from, the level of the largest lakes since 1992, and river levels from the SWOT satellite.",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Any (web browser)",
+        "browserRequirements": "Requires JavaScript and WebGL.",
+        "inLanguage": "en",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "image": "https://inlandwater.bristleconelab.org/og-image.png",
+        "license": "https://opensource.org/licenses/MIT",
+        "codeRepository": "https://github.com/bristleconelab/inland-water-atlas",
+        "about": ["Lakes", "Rivers", "Lake depth", "Bathymetry", "Hydrology", "Satellite altimetry", "SWOT"],
+        "isBasedOn": ["https://www.hydrosheds.org/products/hydrolakes", "https://www.hydrosheds.org/products/hydrorivers", "https://www.wikidata.org"],
+        "publisher": { "@id": "https://inlandwater.bristleconelab.org/#org" }
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://inlandwater.bristleconelab.org/#site",
+        "name": "Inland Water Atlas",
+        "url": "https://inlandwater.bristleconelab.org/",
+        "image": "https://inlandwater.bristleconelab.org/icon-512.png",
+        "publisher": { "@id": "https://inlandwater.bristleconelab.org/#org" }
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://inlandwater.bristleconelab.org/#org",
+        "name": "bristlecone lab",
+        "url": "https://github.com/bristleconelab",
+        "logo": "https://inlandwater.bristleconelab.org/brand/bristleconelab-mark-dark-128.png",
+        "sameAs": ["https://github.com/bristleconelab"]
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
   <div id="map" aria-label="Map of the world's lakes and rivers. Click one to see what is known about it and how."></div>
 
   <header class="masthead">
-    <h1>Inland Water Atlas</h1>
+    <h1><img class="mark" src="/brand/inland-water-atlas-mark.svg" alt="" width="46" height="40">Inland Water Atlas</h1>
     <p class="sub">Lakes and rivers: what is measured, what is seen from space, and what is only a model.</p>
     <div class="search" role="search">
       <label for="search" class="visually-hidden">Find a lake or river</label>
@@ -87,6 +140,9 @@
     <p>Code: <a href="https://github.com/bristleconelab/inland-water-atlas">github.com/bristleconelab/inland-water-atlas</a> (MIT). From <a href="https://bristleconelab.org">Bristlecone Lab</a>; see also <a href="https://oceanlife.bristleconelab.org">Ocean Life Atlas</a>, <a href="https://underworld.bristleconelab.org">Underworld</a> and <a href="https://seaflooratlas.org">Seafloor Atlas</a>.</p>
   </dialog>
 
+  <noscript>
+    <p>Inland Water Atlas is a map of the world's 1.4 million lakes and 7,000 named rivers. For each lake it shows whether its depth is measured, seen from space or only modelled, how its water has changed since 1984, where its water goes and where it comes from. It needs JavaScript and WebGL. Code and data sources: <a href="https://github.com/bristleconelab/inland-water-atlas">github.com/bristleconelab/inland-water-atlas</a>.</p>
+  </noscript>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

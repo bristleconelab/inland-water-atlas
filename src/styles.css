@@ -19,7 +19,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .maplibregl-ctrl-attrib { font: 11px var(--sans); }
 
 .masthead { position: fixed; top: 16px; left: 18px; z-index: 4; width: min(380px, calc(100vw - 36px)); }
-.masthead h1 { margin: 0; font-size: 38px; line-height: 0.95; font-weight: 800; letter-spacing: -0.035em; font-variation-settings: 'wdth' 78, 'opsz' 96; text-shadow: 0 2px 14px rgb(0 0 0 / 0.5); }
+.masthead h1 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 38px; line-height: 0.95; font-weight: 800; letter-spacing: -0.035em; font-variation-settings: 'wdth' 78, 'opsz' 96; text-shadow: 0 2px 14px rgb(0 0 0 / 0.5); }
 .sub { margin: 6px 0 12px; color: #c9d6dd; text-shadow: 0 1px 2px rgb(0 0 0 / 0.9), 0 0 12px rgb(0 0 0 / 0.8); } /* readable over yellow lakes */
 .search { position: relative; }
 #search { width: 100%; height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 22px; background: rgb(19 36 47 / 0.92); color: var(--ink); font: 16px var(--sans); }
@@ -72,7 +72,7 @@ dialog h2 { margin: 0 0 8px; font-size: 26px; } dialog h3 { margin: 18px 0 6px; 
 dialog p, dialog li { max-width: 68ch; } .sources li, dialog ul li { margin-bottom: 6px; }
 
 @media (max-width: 760px) {
-  .masthead h1 { font-size: 30px; } .sub { display: none; }
+  .masthead h1 { font-size: 30px; } .masthead h1 .mark { width: 36px; height: 31px; } .sub { display: none; }
   #key { bottom: 10px; left: 10px; right: 10px; width: auto; padding: 10px 12px; }
   #headline { font-size: 14px; } .tiers .fine { display: none; }
   #panel { top: auto; bottom: 0; left: 0; right: 0; width: auto; max-height: 60vh; border-radius: 18px 18px 0 0; }
@@ -100,3 +100,4 @@ dialog p, dialog li { max-width: 68ch; } .sources li, dialog ul li { margin-bott
 #compare-list { list-style: none; margin: 6px 0; padding: 0; display: grid; gap: 4px; font-size: 13px; }
 #compare-list li { display: grid; grid-template-columns: 12px 1fr auto auto; gap: 8px; align-items: center; }
 @media (max-width: 1200px) { #compare { width: calc(100vw - 36px); bottom: auto; top: 160px; } }
+.masthead h1 .mark { flex: none; filter: drop-shadow(0 2px 8px rgb(0 0 0 / 0.5)); }
