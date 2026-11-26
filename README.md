@@ -103,6 +103,11 @@ data and code; the Global Surface Water Explorer shows water extent, not depth.
 
 ## How it is built
 
+Every formula and filter is in [docs/method.md](docs/method.md); what was checked, against what, is in
+[docs/validation.md](docs/validation.md) (river lengths against Wikidata, the depth model against published maxima, the
+trend statistics against scipy, reproducibility).
+
+
 The pipeline runs on a Linux server (`pipeline/`): `build_lakes.py` joins HydroLAKES, 3D-LAKES and Wikidata and writes
 `out/stats.json`; `build_rivers.py` names the rivers; `build_tiles.sh` makes vector tiles with
 [tippecanoe](https://github.com/felt/tippecanoe) (lakes, labels, rivers, river names); `split_pmtiles.mjs` cuts them

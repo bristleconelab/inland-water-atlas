@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use the Inland Water Atlas or its derived data, please cite it and the datasets it is built on (see README.md, Data)."
+title: "Inland Water Atlas: the world's lakes and rivers, and how we know them"
+type: software
+authors:
+  - name: "Bristlecone Lab"
+    website: "https://bristleconelab.org"
+repository-code: "https://github.com/bristleconelab/inland-water-atlas"
+url: "https://inlandwater.bristleconelab.org"
+license: MIT
+keywords:
+  - lakes
+  - rivers
+  - bathymetry
+  - lake depth
+  - SWOT
+  - satellite altimetry
+  - HydroLAKES
+  - HydroRIVERS
