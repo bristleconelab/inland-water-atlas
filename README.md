@@ -26,8 +26,17 @@ The panel also answers two more questions:
   a named sea; 8,597 end inland, in a basin with no outlet (named after the lake they end in, such as the Aral Sea);
   for 2,206 the river map stops without reaching a sea, and the panel says so.
 - **How has its water changed?** For 20,807 lakes and reservoirs, the yearly water volume from 1984 to 2025 on a scale
-  from zero, with one sentence comparing the first five years with the last five. Lakes that fill in wet years and dry
-  out in between are described as such instead of being given a trend.
+  from zero, with one sentence comparing the first five years with the last five, and the trend over the whole record:
+  the Theil-Sen slope as a share of the lake's usual volume a decade with its 95 % interval, and a Mann-Kendall test
+  corrected for year-to-year carry-over (Hamed and Rao 1998), drawn as a dashed line. Lakes that fill in wet years and
+  dry out in between are described as such instead of being given a trend.
+- **What shape is its bed?** For every lake, the area against depth from GLOBathy's model (dashed), with the levels
+  satellites traced (3D-LAKES) as dots, and how far the model's maximum depth is from a published one.
+
+**How wrong is the model?** A map view colours the 970 lakes whose maximum depth is published on Wikidata (with the
+criterion "maximum") by how far GLOBathy's model maximum is from it. The model is unbiased overall (median ratio
+1.05), but within a factor of two for only 61 % of these lakes and within a quarter for
+24 %; for lakes under 1 km² it is 1.37 times too deep on the median.
 
 Click a river to see the same kind of answer for it:
 
@@ -69,6 +78,7 @@ data and code; the Global Surface Water Explorer shows water extent, not depth.
 | Data | Source | Licence |
 |---|---|---|
 | Lake outlines, area, volume and depth, volume source | [HydroLAKES v1.0](https://www.hydrosheds.org/products/hydrolakes), Messager et al. (2016) | CC BY 4.0 |
+| Modelled depth, mean depth and area-depth curve of every lake | [GLOBathy](https://doi.org/10.6084/m9.figshare.13402070), Khazaei et al. (2022) Scientific Data | CC0 |
 | Water-level band seen by ICESat-2 and Landsat (L1) | [3D-LAKES](https://doi.org/10.5281/zenodo.13107867), Huang et al. (2025) Scientific Data | CC BY 4.0 |
 | Names (125,598 lakes) and published depths (7,616 lakes) | [Wikidata](https://www.wikidata.org) via [QLever](https://qlever.dev), matched when the item's point is inside the lake | CC0 |
 | Rivers, flow at least 5 m³/s; downstream paths | [HydroRIVERS v1.0](https://www.hydrosheds.org/products/hydrorivers), Lehner and Grill (2013) | CC BY 4.0 |

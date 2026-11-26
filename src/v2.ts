@@ -94,7 +94,7 @@ export function volumeLabel(v: number): string {
 
 /** Yearly water volume from zero (so a lake losing 1 % does not look like one that dried out), with the scale on the
  *  left and the value of each year on hover; gaps stay open. */
-export function sparkline(w: Water, width = 300, height = 84): string {
+export function sparkline(w: Water, width = 300, height = 84, line?: { slope: number; intercept: number }): string {
   const vals = w.v.filter((v): v is number => v != null);
   if (!vals.length) return '';
   const L = 52, T = 6, B = 6;
@@ -109,7 +109,13 @@ export function sparkline(w: Water, width = 300, height = 84): string {
     dots += `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="2.2" fill-opacity="0"><title>${w.y0 + i}: ${volumeLabel(v)}</title></circle>`;
   });
   const axis = `<g font-size="10" fill="currentColor" fill-opacity="0.7" text-anchor="end"><text x="${L - 4}" y="${Y(hi) + 4}">${volumeLabel(hi)}</text><text x="${L - 4}" y="${Y(0)}">0</text></g><line x1="${L}" x2="${width}" y1="${Y(0)}" y2="${Y(0)}" stroke="currentColor" stroke-opacity="0.3"/><line x1="${L}" x2="${width}" y1="${Y(hi)}" y2="${Y(hi)}" stroke="currentColor" stroke-opacity="0.12"/>`;
-  return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="Water volume by year, ${w.y0} to ${w.y0 + n - 1}, up to ${volumeLabel(hi)}">${axis}<path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><g fill="currentColor" stroke="none">${dots}</g></svg>`;
+  // the Theil-Sen line, dashed, clipped to the chart
+  let fit = '';
+  if (line) {
+    const yv = (i: number) => Math.min(hi, Math.max(0, line.intercept + line.slope * (w.y0 + i)));
+    fit = `<path d="M${X(0).toFixed(1)},${Y(yv(0)).toFixed(1)}L${X(n - 1).toFixed(1)},${Y(yv(n - 1)).toFixed(1)}" stroke="currentColor" stroke-opacity="0.55" stroke-width="1.2" stroke-dasharray="4 3" fill="none"><title>Theil-Sen trend</title></path>`;
+  }
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="Water volume by year, ${w.y0} to ${w.y0 + n - 1}, up to ${volumeLabel(hi)}">${axis}${fit}<path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><g fill="currentColor" stroke="none">${dots}</g></svg>`;
 }
 
 // ---------- fetching ----------

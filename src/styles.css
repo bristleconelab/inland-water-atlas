@@ -83,3 +83,7 @@ dialog p, dialog li { max-width: 68ch; } .sources li, dialog ul li { margin-bott
 .spark.level { color: #7fb6e8; }
 .more .link { display: block; margin: 2px 0 8px; }
 #hits li.none { display: block; color: var(--muted); cursor: default; }
+.more p.trend { font-size: 13.5px; color: #c9d6dd; }
+.sw.err { background: linear-gradient(90deg, rgb(58 120 230), rgb(236 236 228), rgb(226 74 51)); }
+#error-note { margin: 6px 0 8px; }
+.spark.shape { color: #e8eef1; }

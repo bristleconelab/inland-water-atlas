@@ -1,9 +1,9 @@
 // Name search over named lakes (pipeline/build_search.py) and named rivers (pipeline/build_rivers.py). Pure
 // (test/search.test.ts).
 export interface SearchIndex { n: string[]; id: number[]; x: number[]; y: number[]; a: number[]; t: number[]; c?: string[] }
-export interface RiverIndex { n: string[]; id: number[]; x: number[]; y: number[]; q: number[]; km: number[] }
+export interface RiverIndex { n: string[]; id: number[]; x: number[]; y: number[]; q: number[]; km: number[]; to?: string[] }
 export interface Hit { name: string; id: number; lon: number; lat: number; area: number; tier: number; starts: boolean; country?: string }
-export interface RiverHit { name: string; id: number; lon: number; lat: number; km: number; q: number; starts: boolean }
+export interface RiverHit { name: string; id: number; lon: number; lat: number; km: number; q: number; starts: boolean; to?: string }
 
 /** Lower case without accents, so "leman" finds "Léman". */
 export function fold(s: string): string {
@@ -39,7 +39,7 @@ export function prefixSearch(ix: SearchIndex, query: string, limit = 8): Hit[] {
 }
 
 export function riverSearch(ix: RiverIndex, query: string, limit = 8): RiverHit[] {
-  return match(ix.n, query, limit, ix.id).map(([i, starts]) => ({ name: ix.n[i], id: ix.id[i], lon: ix.x[i] / 100, lat: ix.y[i] / 100, km: ix.km[i], q: ix.q[i], starts }));
+  return match(ix.n, query, limit, ix.id).map(([i, starts]) => ({ name: ix.n[i], id: ix.id[i], lon: ix.x[i] / 100, lat: ix.y[i] / 100, km: ix.km[i], q: ix.q[i], starts, to: ix.to?.[i] || undefined }));
 }
 
 export type AnyHit = ({ kind: 'lake' } & Hit) | ({ kind: 'river' } & RiverHit);

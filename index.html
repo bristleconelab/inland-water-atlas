@@ -35,7 +35,9 @@
       <li><label><input type="checkbox" data-tier="2" checked><span class="sw t2"></span><span><b>Seen from space</b> <span class="cnt" id="c2"></span><br><span class="fine">satellites saw the water level move</span></span></label></li>
       <li><label><input type="checkbox" data-tier="1" checked><span class="sw t1"></span><span><b>Model only</b> <span class="cnt" id="c1"></span><br><span class="fine">depth is a statistical estimate</span></span></label></li>
       <li><label><input type="checkbox" id="rivers-on" checked><span class="sw riv"></span><span>Rivers</span></label></li>
+      <li><label><input type="checkbox" id="error-on"><span class="sw err"></span><span><b>How wrong is the model?</b><br><span class="fine">lakes with a published maximum depth</span></span></label></li>
     </ul>
+    <p id="error-note" class="fine" hidden></p>
     <button id="about-open" class="link">How this map was made</button>
   </section>
 
@@ -58,6 +60,7 @@
     <h3>Sources</h3>
     <ul class="sources">
       <li>Lakes: <a href="https://www.hydrosheds.org/products/hydrolakes">HydroLAKES v1.0</a>, Messager et al. (2016) Nature Communications (CC BY 4.0).</li>
+      <li>Modelled depths and the shape of each lake bed: <a href="https://doi.org/10.6084/m9.figshare.13402070">GLOBathy</a>, Khazaei et al. (2022) Scientific Data (CC0).</li>
       <li>Seen from space: <a href="https://doi.org/10.5281/zenodo.13107867">3D-LAKES</a>, Huang et al. (2025) Scientific Data (CC BY 4.0).</li>
       <li>Names and published depths: <a href="https://www.wikidata.org">Wikidata</a> (CC0), queried through <a href="https://qlever.dev">QLever</a>.</li>
       <li>Rivers with an average flow of at least 5 m³/s, and where each lake's water goes: <a href="https://www.hydrosheds.org/products/hydrorivers">HydroRIVERS v1.0</a>, Lehner and Grill (2013) (CC BY 4.0).</li>

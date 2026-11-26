@@ -15,6 +15,9 @@ const protocol = new Protocol();
 maplibregl.addProtocol('pmtiles', protocol.tile);
 
 export const SELECT_COLOR = '#ff5d8f';
+/** Lakes by the evidence for their depth (the model-error view swaps these out, src/main.ts). */
+export const LAKE_COLOR = ['match', ['get', 'tier'], 3, TIERS[3].color, 2, TIERS[2].color, TIERS[1].color] as unknown as maplibregl.ExpressionSpecification;
+export const LAKE_OPACITY = ['match', ['get', 'tier'], 3, 0.95, 2, 0.85, 0.55] as unknown as maplibregl.ExpressionSpecification;
 /** The way the water goes: a light, dashed line that reads on both rivers and land. */
 export const FLOW_COLOR = '#fff1b8';
 
@@ -30,7 +33,6 @@ export async function createMap(container: HTMLElement): Promise<maplibregl.Map>
   const archive = manifest['lakes-atlas'];
   archive.base = new URL(archive.base, TILES).href;
   protocol.add(new PMTiles(new ChunkedSource(archive)));
-  const tier = (t: 1 | 2 | 3) => TIERS[t].color;
 
   const style: StyleSpecification = {
     version: 8,
@@ -39,7 +41,7 @@ export async function createMap(container: HTMLElement): Promise<maplibregl.Map>
     sky: { 'sky-color': '#0c1a24', 'horizon-color': '#24485a', 'atmosphere-blend': ['interpolate', ['linear'], ['zoom'], 0, 0.9, 5, 0.5, 7, 0] },
     sources: {
       earth: { type: 'raster', tiles: [GIBS], tileSize: 256, maxzoom: 8, attribution: 'Imagery: NASA Blue Marble via <a href="https://earthdata.nasa.gov/gibs">GIBS</a>' },
-      atlas: { type: 'vector', url: `pmtiles://${archive.base}`, attribution: 'Lakes: HydroLAKES, 3D-LAKES, Wikidata; rivers: HydroRIVERS, SWORD (names © OpenStreetMap contributors)' },
+      atlas: { type: 'vector', url: `pmtiles://${archive.base}`, promoteId: { lakes: 'id' }, attribution: 'Lakes: HydroLAKES, 3D-LAKES, Wikidata; rivers: HydroRIVERS, SWORD (names © OpenStreetMap contributors)' },
       selected: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
       flow: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
     },
@@ -58,8 +60,8 @@ export async function createMap(container: HTMLElement): Promise<maplibregl.Map>
       {
         id: 'lakes', type: 'fill', source: 'atlas', 'source-layer': 'lakes',
         paint: {
-          'fill-color': ['match', ['get', 'tier'], 3, tier(3), 2, tier(2), tier(1)],
-          'fill-opacity': ['match', ['get', 'tier'], 3, 0.95, 2, 0.85, 0.55],
+          'fill-color': LAKE_COLOR,
+          'fill-opacity': LAKE_OPACITY,
           'fill-antialias': true,
         },
       },

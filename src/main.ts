@@ -3,9 +3,11 @@ import '@fontsource-variable/source-serif-4';
 import './styles.css';
 import type { FilterSpecification, GeoJSONSource, Map as MlMap } from 'maplibre-gl';
 import { areaWords, depthCheck, evidence, KIND, TIERS, verdict, type LakeProps } from './lake';
-import { createMap, lakeAt, riverAt, TILES } from './map';
-import { decodePath, flowSentence, lakeFlow, lakeWater, sparkline, waterSummary } from './v2';
+import { createMap, LAKE_COLOR, LAKE_OPACITY, lakeAt, riverAt, TILES } from './map';
+import { decodePath, flowSentence, lakeFlow, lakeWater, seaName, sparkline, waterSummary } from './v2';
 import { levelChart, levelSummary, riverEnd, riverFacts, riverLines, riverRecord, swotLevels, theRiver, type Reach, type River } from './river';
+import { trend, trendWords } from './trend';
+import { errorColor, lakeShape, modelError, shapeChart, shapeWords } from './shape';
 import { mergeHits, prefixSearch, riverSearch, type RiverIndex, type SearchIndex } from './search';
 
 const $ = <T extends HTMLElement>(s: string) => document.querySelector(s) as T;
@@ -46,6 +48,19 @@ document.querySelectorAll<HTMLInputElement>('input[data-tier]').forEach((cb) => 
   const f = ['in', ['get', 'tier'], ['literal', [...tiersOn]]] as unknown as FilterSpecification;
   map?.setFilter('lakes', f); map?.setFilter('lakes-edge', f);
 }));
+// ---------- model error view: GLOBathy's maximum depth against published maxima (src/shape.ts) ----------
+let errorView = false;
+$<HTMLInputElement>('#error-on').addEventListener('change', async (e) => {
+  errorView = (e.target as HTMLInputElement).checked;
+  const me = await modelError(TILES);
+  if (!me || !map) return;
+  for (const [id, [pub, mod]] of Object.entries(me.lakes))
+    map.setFeatureState({ source: 'atlas', sourceLayer: 'lakes', id: Number(id) }, { err: errorView, c: errorColor(mod, pub) });
+  map.setPaintProperty('lakes', 'fill-color', errorView ? ['case', ['boolean', ['feature-state', 'err'], false], ['feature-state', 'c'], '#3a4650'] : LAKE_COLOR);
+  map.setPaintProperty('lakes', 'fill-opacity', errorView ? ['case', ['boolean', ['feature-state', 'err'], false], 1, 0.35] : LAKE_OPACITY);
+  $('#error-note').hidden = !errorView;
+  $('#error-note').textContent = `${fmt(me.stats.n)} lakes have a published maximum depth. GLOBathy's model is within a factor of two for ${Math.round(me.stats.withinFactor2 * 100)} % of them and within a quarter for ${Math.round(me.stats.withinFactor1_25 * 100)} %. Blue: the model is too shallow; red: too deep.`;
+});
 $<HTMLInputElement>('#rivers-on').addEventListener('change', (e) => {
   const v = (e.target as HTMLInputElement).checked ? 'visible' : 'none';
   for (const id of ['rivers', 'river-labels']) map?.setLayoutProperty(id, 'visibility', v);
@@ -75,8 +90,8 @@ function showLake(p: LakeProps, at: [number, number]) {
   const links = el('p', 'links');
   if (p.q) { const a = el('a', '', 'Wikidata item') as HTMLAnchorElement; a.href = `https://www.wikidata.org/wiki/${p.q}`; a.target = '_blank'; a.rel = 'noopener'; links.append(a); }
   links.append(el('span', 'fine', `HydroLAKES id ${p.id}`));
-  const flowBox = el('section', 'more'), waterBox = el('section', 'more');
-  body.append(flowBox, waterBox, links);
+  const flowBox = el('section', 'more'), waterBox = el('section', 'more'), shapeBox = el('section', 'more');
+  body.append(flowBox, waterBox, shapeBox, links);
   if (p.tier === 1) body.append(el('p', 'fine', 'Know a published depth for this lake? Adding it to the lake’s Wikidata item (with a source) will show it here after the next update.'));
   panel.hidden = false;
   setFlow(null);
@@ -95,13 +110,23 @@ function showLake(p: LakeProps, at: [number, number]) {
       flowBox.append(b, el('p', 'fine', 'Along HydroRIVERS, from where the lake drains, simplified to about 2 km.'));
     }
   });
+  lakeShape(TILES, p.id).then((s) => {
+    if (token !== shown || !s) return;
+    shapeBox.append(el('h3', '', 'The shape of its bed'));
+    const chart = el('div', 'spark shape'); chart.innerHTML = shapeChart(s); // numbers only (src/shape.ts)
+    shapeBox.append(chart);
+    for (const line of shapeWords(s, p.wx)) shapeBox.append(el('p', 'fine', line));
+  });
   lakeWater(TILES, p.id).then((w) => {
     if (token !== shown || !w) return;
     const sum = waterSummary(w);
     waterBox.append(el('h3', '', 'How its water changed'));
     if (sum) waterBox.append(el('p', '', sum.words));
+    // the trend is not told for a lake whose water comes and goes: its start and end are as arbitrary as any other year
+    const tr = sum && !sum.words.startsWith('Its water comes and goes') ? trend(w.y0, w.v) : null;
+    if (tr) waterBox.append(el('p', 'trend', trendWords(tr, w.y0, w.y0 + w.v.length - 1)));
     const chart = el('div', 'spark');
-    chart.innerHTML = sparkline(w); // built from numbers only (src/v2.ts)
+    chart.innerHTML = sparkline(w, 300, 84, tr ?? undefined); // built from numbers only (src/v2.ts)
     const axis = el('div', 'spark-axis');
     axis.append(el('span', '', String(w.y0)), el('span', '', String(w.y0 + w.v.length - 1)));
     waterBox.append(chart, axis, el('p', 'fine', 'Water volume by year, estimated mostly from the lake’s extent in Landsat images (GloLakes). Trust the ups and downs more than the exact amount.'));
@@ -293,7 +318,7 @@ input.addEventListener('input', async () => {
       li.append(sw, el('span', 'hn', r.name), el('span', 'ha', [r.country, areaWords(r.area)].filter(Boolean).join(', ')));
       li.addEventListener('mousedown', (e) => { e.preventDefault(); hits.hidden = true; input.blur(); goToLake(r.id, r.lon, r.lat, zoomFor(r.area)); });
     } else {
-      li.append(el('span', 'sw riv'), el('span', 'hn', r.name), el('span', 'ha', `river, ${fmt(r.km)} km`));
+      li.append(el('span', 'sw riv'), el('span', 'hn', r.name), el('span', 'ha', `${fmt(r.km)} km${r.to ? `, into ${seaName(r.to)}` : ' river'}`));
       li.addEventListener('mousedown', (e) => { e.preventDefault(); hits.hidden = true; input.blur(); history.replaceState(null, '', `#r=${r.id}`); openRiver(r.id, null, true); });
     }
     hits.append(li);
