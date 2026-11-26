@@ -26,7 +26,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #search::placeholder { color: #8098a5; }
 #hits { position: absolute; top: 50px; left: 0; right: 0; margin: 0; padding: 6px; list-style: none; background: var(--night-2); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 14px 34px rgb(0 0 0 / 0.45); }
 #hits li { display: grid; grid-template-columns: 12px 1fr auto; gap: 10px; align-items: center; padding: 7px 8px; border-radius: 9px; cursor: pointer; }
-#hits li:hover { background: rgb(238 243 245 / 0.07); }
+#hits li:hover, #hits li[aria-selected="true"] { background: rgb(238 243 245 / 0.07); }
 .hn { font-weight: 600; } .ha { font-size: 12.5px; color: var(--muted); }
 .sw { width: 12px; height: 12px; border-radius: 4px; flex: none; }
 .t3 { background: var(--t3); } .t2 { background: var(--t2); } .t1 { background: var(--t1); opacity: 0.75; }
