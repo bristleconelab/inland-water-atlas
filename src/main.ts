@@ -7,7 +7,8 @@ import { createMap, LAKE_COLOR, LAKE_OPACITY, lakeAt, riverAt, TILES } from './m
 import { decodePath, flowSentence, lakeFlow, lakeWater, seaName, sparkline, waterSummary } from './v2';
 import { levelChart, levelSummary, riverEnd, riverFacts, riverLines, riverRecord, swotLevels, theRiver, type Reach, type River } from './river';
 import { trend, trendWords } from './trend';
-import { errorColor, lakeShape, modelError, shapeChart, shapeWords } from './shape';
+import { errorColor, lakeShape, modelCurve, modelError, observed, shapeChart, shapeWords } from './shape';
+import { download, scientist, tableHTML, toCSV, type Row } from './sci';
 import { mergeHits, prefixSearch, riverSearch, type RiverIndex, type SearchIndex } from './search';
 
 const $ = <T extends HTMLElement>(s: string) => document.querySelector(s) as T;
@@ -61,6 +62,11 @@ $<HTMLInputElement>('#error-on').addEventListener('change', async (e) => {
   $('#error-note').hidden = !errorView;
   $('#error-note').textContent = `${fmt(me.stats.n)} lakes have a published maximum depth. GLOBathy's model is within a factor of two for ${Math.round(me.stats.withinFactor2 * 100)} % of them and within a quarter for ${Math.round(me.stats.withinFactor1_25 * 100)} %. Blue: the model is too shallow; red: too deep.`;
 });
+$<HTMLInputElement>('#sci-on').checked = scientist.on;
+$<HTMLInputElement>('#sci-on').addEventListener('change', (e) => {
+  scientist.on = (e.target as HTMLInputElement).checked;
+  if (!panel.hidden) applyHash(); // reopen what is shown, now with (or without) the numbers
+});
 $<HTMLInputElement>('#rivers-on').addEventListener('change', (e) => {
   const v = (e.target as HTMLInputElement).checked ? 'visible' : 'none';
   for (const id of ['rivers', 'river-labels']) map?.setLayoutProperty(id, 'visibility', v);
@@ -91,11 +97,13 @@ function showLake(p: LakeProps, at: [number, number]) {
   if (p.q) { const a = el('a', '', 'Wikidata item') as HTMLAnchorElement; a.href = `https://www.wikidata.org/wiki/${p.q}`; a.target = '_blank'; a.rel = 'noopener'; links.append(a); }
   links.append(el('span', 'fine', `HydroLAKES id ${p.id}`));
   const flowBox = el('section', 'more'), waterBox = el('section', 'more'), shapeBox = el('section', 'more');
-  body.append(flowBox, waterBox, shapeBox, links);
+  const sciBox = el('section', 'more sci');
+  body.append(flowBox, waterBox, shapeBox, sciBox, links);
   if (p.tier === 1) body.append(el('p', 'fine', 'Know a published depth for this lake? Adding it to the lake’s Wikidata item (with a source) will show it here after the next update.'));
   panel.hidden = false;
   setFlow(null);
   const token = ++shown;
+  if (scientist.on) lakeNumbers(p, sciBox); // after the token: it checks it when its data arrive
   lakeFlow(TILES, p.id).then((f) => {
     if (token !== shown || !f) return;
     flowBox.append(el('h3', '', 'Where its water goes'), el('p', '', flowSentence(f, p.n)));
@@ -133,6 +141,48 @@ function showLake(p: LakeProps, at: [number, number]) {
   });
 }
 let shown = 0;
+
+/** The numbers view of a lake: every value with its source, and downloads (src/sci.ts). */
+async function lakeNumbers(p: LakeProps, box: HTMLElement) {
+  const token = shown;
+  const [f, w, s, me] = await Promise.all([lakeFlow(TILES, p.id), lakeWater(TILES, p.id), lakeShape(TILES, p.id), modelError(TILES)]);
+  if (token !== shown) return;
+  const tr = w ? trend(w.y0, w.v) : null;
+  const vsName = { 1: 'literature', 2: 'GRanD dam register', 3: 'HydroLAKES model' } as Record<number, string>;
+  const rows: Row[] = [
+    ['HydroLAKES id', p.id, 'HydroLAKES v1.0'], ['Name', p.n], ['Country', p.c], ['Area (km²)', p.a, 'HydroLAKES'],
+    ['Elevation (m)', p.e, 'HydroLAKES'], ['Volume (million m³)', p.v, `HydroLAKES, from ${vsName[p.vs ?? 3] ?? 'model'}`],
+    ['Mean depth (m)', p.d, `HydroLAKES, from ${vsName[p.vs ?? 3] ?? 'model'}`],
+    ['Published mean depth (m)', p.wm, 'Wikidata P4511, criterion mean'], ['Published maximum depth (m)', p.wx, 'Wikidata P4511, criterion maximum'],
+    ['Published depth, kind not given (m)', p.wu, 'Wikidata P4511'], ['Wikidata depth cites a source', p.wr == null ? null : p.wr ? 'yes' : 'no', 'Wikidata references'],
+    ['Wikidata item', p.q, 'Wikidata'], ['Water-level band seen (m)', p.s, '3D-LAKES L1 (ICESat-2, Landsat)'],
+    ['Model maximum depth (m)', s?.g[2], 'GLOBathy'], ['Model mean depth (m)', s?.g[3], 'GLOBathy'],
+    ['Model / published maximum', s && p.wx ? s.g[2] / p.wx : null, 'GLOBathy / Wikidata'],
+    ['River distance to its end (km)', f?.km, 'HydroRIVERS DIST_DN_KM'], ['Ends in', f ? (f.endo ? `basin with no outlet${f.sinkName ? `: ${f.sinkName}` : ''}` : f.sea ?? 'not known') : null, 'HydroRIVERS, Natural Earth'],
+    ['Water record', w ? `${w.y0}–${w.y0 + w.v.length - 1}` : null, 'GloLakes v1.1 (yearly, deseasonalised)'],
+    ['Trend (% of usual volume a decade)', tr && tr.level > 0 ? (tr.slope * 1000) / tr.level : null, 'Theil-Sen'],
+    ['Trend 95 % interval (% a decade)', tr && tr.level > 0 ? `${((tr.lo * 1000) / tr.level).toFixed(2)} to ${((tr.hi * 1000) / tr.level).toFixed(2)}` : null, 'Sen 1968'],
+    ['Mann-Kendall p (Hamed-Rao)', tr?.p, `n = ${tr?.n ?? ''}, tau = ${tr ? tr.tau.toFixed(3) : ''}`],
+  ];
+  box.append(el('h3', '', 'The numbers'));
+  const tbl = el('div', 'sci-wrap'); tbl.innerHTML = tableHTML(rows); // escaped (src/sci.ts)
+  const btns = el('p', 'btns');
+  const b1 = el('button', 'btn-small', 'Numbers (CSV)');
+  b1.addEventListener('click', () => download(`lake-${p.id}.csv`, toCSV(['quantity', 'value', 'source'], rows.filter((r) => r[1] != null).map((r) => [r[0], r[1] as string | number, r[2] ?? '']))));
+  btns.append(b1);
+  if (w) {
+    const b2 = el('button', 'btn-small', 'Water by year (CSV)');
+    b2.addEventListener('click', () => download(`lake-${p.id}-water.csv`, toCSV(['year', 'volume_million_m3'], w.v.map((v, i) => [w.y0 + i, v]))));
+    btns.append(b2);
+  }
+  if (s) {
+    const b3 = el('button', 'btn-small', 'Bed shape (CSV)');
+    b3.addEventListener('click', () => download(`lake-${p.id}-shape.csv`, toCSV(['kind', 'depth_m', 'area_km2'],
+      [...modelCurve(s).map(([d, a]) => ['GLOBathy model', +d.toFixed(2), +a.toFixed(4)]), ...observed(s).map(([d, a]) => ['3D-LAKES observed', d, a])])));
+    btns.append(b3);
+  }
+  box.append(tbl, btns, el('p', 'fine', `Model error over all ${me ? me.stats.n : ''} lakes with a published maximum: within 2x for ${me ? Math.round(me.stats.withinFactor2 * 100) : ''} %.`));
+}
 
 // ---------- river panel ----------
 const RIVER_COLOR = '#7fb6e8';
@@ -185,6 +235,11 @@ function openRiver(rid: number | null, reach: Reach | null, frame: boolean) {
       const mo = (t: number) => new Date(t).toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
       axis.append(el('span', '', mo(pts[0].t)), el('span', '', mo(pts[pts.length - 1].t)));
       levelBox.append(chart, axis, el('p', 'fine', 'Each dot is one pass of the SWOT satellite (NASA and CNES) over this stretch of river, from PO.DAAC Hydrocron. Doubtful passes are left out.'));
+      if (scientist.on) {
+        const b = el('button', 'btn-small', 'SWOT passes (CSV)');
+        b.addEventListener('click', () => download(`swot-${reach.s}.csv`, toCSV(['time_utc', 'wse_m_egm2008', 'wse_u_m'], pts.map((q) => [new Date(q.t).toISOString(), q.h, q.u ?? '']))));
+        const row = el('p', 'btns'); row.append(b); levelBox.append(row);
+      }
     });
   }
 }
@@ -217,6 +272,22 @@ function fillRiver(r: River, rid: number, title: HTMLElement, meta: HTMLElement,
     wayBox.append(b);
   }
   wayBox.append(el('p', 'fine', 'Name from OpenStreetMap through SWORD; length, flow and course from HydroRIVERS.'));
+  if (scientist.on) {
+    const rows: Row[] = [
+      ['River id (HYRIV_ID of its last reach)', rid, 'HydroRIVERS'], ['Name', r.n, 'SWORD / Wikidata English label'], ['Local name', r.l, 'SWORD (OpenStreetMap)'],
+      ['Length (km)', r.km, 'HydroRIVERS DIST_DN_KM'], ['Mean flow at its end (m³/s)', r.q, 'WaterGAP 1971–2000 in HydroRIVERS'],
+      ['Drainage area (km²)', r.up, 'HydroRIVERS UPLAND_SKM'], ['Flows into', r.intoName, 'HydroRIVERS + SWORD'],
+      ['Ends in', r.endo ? `basin with no outlet${r.sinkName ? `: ${r.sinkName}` : ''}` : r.sea ?? null, 'Natural Earth'],
+      ['Distance on to the end (km)', r.dkm, 'HydroRIVERS'], ['Width (m)', r.w, 'SWORD (Landsat, GRWL)'],
+      ['Stretches measured by SWOT (5+ passes)', r.swot?.[0], 'SWORD v17c'], ['Width seen by SWOT (m)', r.swot?.[1], 'SWORD v17c'],
+      ['Wikidata item', r.wd, 'Wikidata'], ['Clicked reach', reach?.id, 'HydroRIVERS'], ['SWORD reach at the click', reach?.s, 'SWORD v17c'],
+    ];
+    const box = el('div', 'sci-wrap'); box.innerHTML = tableHTML(rows); // escaped (src/sci.ts)
+    const b = el('button', 'btn-small', 'Numbers (CSV)');
+    b.addEventListener('click', () => download(`river-${rid}.csv`, toCSV(['quantity', 'value', 'source'], rows.filter((x) => x[1] != null).map((x) => [x[0], x[1] as string | number, x[2] ?? '']))));
+    const row2 = el('p', 'btns'); row2.append(b);
+    wayBox.append(el('h3', '', 'The numbers'), box, row2);
+  }
   if (r.wd) {
     const a = el('a', '', 'Wikidata item') as HTMLAnchorElement;
     a.href = `https://www.wikidata.org/wiki/${r.wd}`; a.target = '_blank'; a.rel = 'noopener';
