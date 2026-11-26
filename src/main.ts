@@ -265,6 +265,12 @@ function goToReach(id: number, lon: number, lat: number, zoom: number) {
 // ---------- search ----------
 let index: SearchIndex | null = null, rindex: RiverIndex | null = null;
 const input = $<HTMLInputElement>('#search'), hits = $<HTMLUListElement>('#hits');
+let cursor = -1; // the hit chosen with the arrow keys
+const highlight = (i: number) => {
+  cursor = i;
+  [...hits.children].forEach((li, k) => li.setAttribute('aria-selected', String(k === i)));
+  if (i >= 0) input.setAttribute('aria-activedescendant', `hit-${i}`); else input.removeAttribute('aria-activedescendant');
+};
 const loadIndexes = async () => {
   [index, rindex] = await Promise.all([
     index ?? fetch(`${base}data/search.json`).then((r) => r.json()),
@@ -276,8 +282,8 @@ input.addEventListener('input', async () => {
   if (!index || !rindex) await loadIndexes();
   const res = mergeHits(prefixSearch(index!, input.value, 8), riverSearch(rindex!, input.value, 8), 8);
   hits.replaceChildren();
-  for (const r of res) {
-    const li = el('li'); li.setAttribute('role', 'option');
+  for (const [i, r] of res.entries()) {
+    const li = el('li'); li.setAttribute('role', 'option'); li.id = `hit-${i}`;
     if (r.kind === 'lake') {
       const sw = el('span', 'sw'); sw.style.background = TIERS[r.tier as 1 | 2 | 3].color;
       li.append(sw, el('span', 'hn', r.name), el('span', 'ha', areaWords(r.area)));
@@ -289,9 +295,16 @@ input.addEventListener('input', async () => {
     hits.append(li);
   }
   hits.hidden = !res.length;
+  highlight(-1);
   input.setAttribute('aria-expanded', String(!hits.hidden));
 });
-input.addEventListener('keydown', (e) => { if (e.key === 'Enter') (hits.firstElementChild as HTMLElement | null)?.dispatchEvent(new MouseEvent('mousedown')); if (e.key === 'Escape') { hits.hidden = true; input.blur(); } });
+input.addEventListener('keydown', (e) => {
+  const n = hits.hidden ? 0 : hits.children.length;
+  if (e.key === 'ArrowDown' && n) { e.preventDefault(); highlight(Math.min(cursor + 1, n - 1)); }
+  if (e.key === 'ArrowUp' && n) { e.preventDefault(); highlight(Math.max(cursor - 1, 0)); }
+  if (e.key === 'Enter') (hits.children[Math.max(cursor, 0)] as HTMLElement | undefined)?.dispatchEvent(new MouseEvent('mousedown'));
+  if (e.key === 'Escape') { hits.hidden = true; input.blur(); }
+});
 input.addEventListener('blur', () => setTimeout(() => { hits.hidden = true; }, 150));
 const zoomFor = (km2: number) => Math.max(3, Math.min(12, 10.5 - Math.log2(Math.max(km2, 0.1)) / 2));
 
