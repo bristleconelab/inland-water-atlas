@@ -342,6 +342,33 @@ def main() -> None:
         relabel += len(path)
     log(f"reaches joined to the river above and below them: {relabel:,}")
 
+    # a river cut by several stretches in a row that SWORD named after tributaries (the Yenisei below the Sayan:
+    # "Oya", "Abakan", then "Sisim" at the Krasnoyarsk reservoir; the Mekong: "H.Kadian", "Nam Lepou"). From the farthest
+    # top of each river, climb the main branch; if the same name comes back within half the river's length (and 1,500
+    # km), the main-branch reaches on the way are that river. Only the main stem is renamed: the tributaries' own
+    # branches keep their names.
+    same_above = np.zeros(N, bool)
+    same_above[parent_[(KEY[child] >= 0) & (KEY[child] == KEY[parent_])]] = True
+    _, groups = chains()
+    rejoined = 0
+    for b, mem in sorted(groups.items(), key=lambda kv: -len(kv[1])):
+        k = KEY[b]
+        if np.any(KEY[mem] != k):
+            continue  # part of it was renamed by a bigger river just now
+        cand = mem[~same_above[mem]]
+        if not len(cand):
+            continue
+        top = cand[np.argmax(dist[cand] + length[cand])]
+        limit = min(1500.0, max(300.0, 0.5 * float(dist[top] + length[top] - dist[b])))
+        path, i = [], UPMAIN[top]
+        while i >= 0 and KEY[i] != k and dist[i] - dist[top] <= limit:
+            path.append(i)
+            i = UPMAIN[i]
+        if path and i >= 0 and KEY[i] == k:
+            KEY[path] = k
+            rejoined += len(path)
+    log(f"main-stem reaches rejoined to their river: {rejoined:,}")
+
     # headwaters: up the main branch from the top of each named chain, while nameless
     # (only from a real top: no branch above it has the same name. Below Lyon the Saone is the bigger branch and has no
     # name in SWORD; starting there would have carried the Rhone's name up the Saone)
@@ -480,7 +507,22 @@ def main() -> None:
                 best_q, best_sl = q_, it["sl"]
         if best_q:
             rec["wd"] = best_q
+        rec["_basin"] = int(out)
         rivers[int(ids[root])] = rec
+    # the same name twice at one sea (or one inland basin), not joined: the smaller one with a different local name is shown by that name
+    # (a tributary of the Yenisei Gulf, its own system in HydroRIVERS, carries "Yenisei River" in SWORD's English field, "Большая Хета" locally)
+    biggest: dict[tuple, int] = {}
+    for rid_, rec in rivers.items():
+        kk = (rec.get("sea") or rec["_basin"], key_of(rec["n"]))
+        if kk not in biggest or rec["q"] > rivers[biggest[kk]]["q"]:
+            biggest[kk] = rid_
+    renamed = 0
+    for rid_, rec in rivers.items():
+        basin = rec.pop("_basin")
+        if biggest[(rec.get("sea") or basin, key_of(rec["n"]))] != rid_ and rec.get("l"):
+            rec["n"] = rec.pop("l")
+            renamed += 1
+    log(f"duplicates shown by their local name: {renamed:,}")
     for rec in rivers.values():
         if "from" in rec:
             rec["fromName"] = rivers.get(rec.pop("from"), {}).get("n")

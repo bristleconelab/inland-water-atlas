@@ -116,7 +116,7 @@ export function swotLevels(reach: number): Promise<Level[] | null> {
 
 // ---------- river records ----------
 // bump with pipeline/build_rivers.py output, like DATA_VERSION in v2.ts (the tile site caches files for a week)
-const RIVER_VERSION = '2026-11-26';
+const RIVER_VERSION = '2026-11-26b';
 const shardCache = new Map<string, Promise<Record<string, River>>>();
 export async function riverRecord(base: string, id: number, shards = 128): Promise<River | null> {
   const url = `${base}v2/river/${String(id % shards).padStart(3, '0')}.json?v=${RIVER_VERSION}`;

@@ -106,7 +106,7 @@ river below it when that name also continues up one of its branches (a confluenc
 stretch between two parts of one river joins it (the Ob's "Sharap" stretch), nameless gaps such as reservoirs are filled
 when the same name continues below, and the name is carried up the biggest branch to the farthest source. Labels use
 one merged line per river. `build_search_rivers.py` writes the river search index, under both the name and the local
-name. The tile archive is rebuilt under a new name for each version (`lakes-atlas-v3/`), because the tile site lets
+name. The tile archive is rebuilt under a new name for each version (`lakes-atlas-v4/`), because the tile site lets
 browsers cache files for a week.
 
 ## Honest limits

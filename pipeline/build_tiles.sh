@@ -12,7 +12,7 @@ set -euo pipefail
 # run from the data folder that holds raw/, out/ and tools/tippecanoe (a tippecanoe checkout, built with make)
 cd "${LAKES_DATA:-.}"
 T=${TIPPECANOE:-tools/tippecanoe}
-NAME=${NAME:-lakes-atlas-v3}
+NAME=${NAME:-lakes-atlas-v4}
 mkdir -p out/tmp
 if [ -z "${ONLY_RIVERS:-}" ]; then
 $T/tippecanoe -o out/tmp/lakes.pmtiles --force -P -l lakes -Z0 -z10 \

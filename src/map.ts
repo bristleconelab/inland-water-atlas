@@ -22,10 +22,10 @@ export const FLOW_COLOR = '#fff1b8';
  *  are far bigger than the app. VITE_TILES overrides the location (the dev setup serves them from localhost:5401). */
 export const TILES: string = import.meta.env.VITE_TILES ?? 'https://lakes-atlas-tiles.pages.dev/';
 /** Bump when the tile archive is rebuilt (pipeline/build_tiles.sh NAME). */
-const TILES_VERSION = 'v3';
+const TILES_VERSION = 'v4';
 
 export async function createMap(container: HTMLElement): Promise<maplibregl.Map> {
-  // versioned: the tile site caches files for a week, and a new archive lives under a new folder (lakes-atlas-v3/)
+  // versioned: the tile site caches files for a week, and a new archive lives under a new folder (lakes-atlas-v4/)
   const manifest = await fetch(`${TILES}manifest.json?v=${TILES_VERSION}`).then((r) => r.json()) as Record<string, ChunkedArchive>;
   const archive = manifest['lakes-atlas'];
   archive.base = new URL(archive.base, TILES).href;
