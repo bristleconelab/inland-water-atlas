@@ -47,6 +47,14 @@
     <div class="panel-body"></div>
   </aside>
 
+  <section id="compare" hidden aria-label="Compare lakes">
+    <button class="close" aria-label="Close the comparison">×</button>
+    <h2>Water, each lake against its usual volume</h2>
+    <div id="compare-chart"></div>
+    <ul id="compare-list"></ul>
+    <p class="fine">GloLakes yearly volumes, without the seasons; 100 % is each lake's median. Trends: Theil-Sen a decade, Mann-Kendall p corrected for carry-over.</p>
+  </section>
+
   <p id="hint">Click any lake or river</p>
 
   <dialog id="about" aria-labelledby="about-title">
@@ -65,6 +73,8 @@
       <li>Seen from space: <a href="https://doi.org/10.5281/zenodo.13107867">3D-LAKES</a>, Huang et al. (2025) Scientific Data (CC BY 4.0).</li>
       <li>Names and published depths: <a href="https://www.wikidata.org">Wikidata</a> (CC0), queried through <a href="https://qlever.dev">QLever</a>.</li>
       <li>Rivers with an average flow of at least 5 m³/s, and where each lake's water goes: <a href="https://www.hydrosheds.org/products/hydrorivers">HydroRIVERS v1.0</a>, Lehner and Grill (2013) (CC BY 4.0).</li>
+      <li>Catchments: <a href="https://www.hydrosheds.org/products/hydrobasins">HydroBASINS v1c</a> level 8 (CC BY 4.0).</li>
+      <li>Water level of the largest lakes since 1992: radar altimetry from the <a href="https://earth.gsfc.nasa.gov/gwm/lake/Index">NASA GSFC Global Water Monitor</a> (formerly USDA G-REALM; US Government work).</li>
       <li>Water volume since 1984: <a href="https://doi.org/10.25914/K8ZF-6G46">GloLakes v1.1</a>, Hou et al. (2024) Earth System Science Data (CC BY 4.0).</li>
       <li>Names of the seas where rivers end: <a href="https://www.naturalearthdata.com">Natural Earth</a> (public domain).</li>
       <li>River names, widths and the stretches SWOT has measured: <a href="https://doi.org/10.5281/zenodo.23870877">SWORD v17c</a>, the SWOT River Database (CC BY 4.0); names © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors.</li>

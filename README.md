@@ -30,13 +30,23 @@ The panel also answers two more questions:
   the Theil-Sen slope as a share of the lake's usual volume a decade with its 95 % interval, and a Mann-Kendall test
   corrected for year-to-year carry-over (Hamed and Rao 1998), drawn as a dashed line. Lakes that fill in wet years and
   dry out in between are described as such instead of being given a trend.
+- **Where does its water come from?** For every lake of at least 10 km² and every named river, its catchment drawn on
+  the map (HydroBASINS level-8 units upstream of its outlet), its area and the lakes in it.
+- **How has the level of the largest lakes changed?** For 457 lakes that radar altimeters follow (the Caspian,
+  Baikal, Victoria, the Great Lakes, which GloLakes leaves out), the yearly water level since 1992 with its trend in
+  centimetres a decade. The Caspian fell by about 2 m between 1992 and 2025.
 - **What shape is its bed?** For every lake, the area against depth from GLOBathy's model (dashed), with the levels
   satellites traced (3D-LAKES) as dots, and how far the model's maximum depth is from a published one.
 
-**How wrong is the model?** A map view colours the 970 lakes whose maximum depth is published on Wikidata (with the
-criterion "maximum") by how far GLOBathy's model maximum is from it. The model is unbiased overall (median ratio
-1.05), but within a factor of two for only 61 % of these lakes and within a quarter for
-24 %; for lakes under 1 km² it is 1.37 times too deep on the median.
+**How wrong is the model?** A map view colours the 926 lakes whose maximum depth is published on Wikidata (with the
+criterion "maximum") and was not itself used by GLOBathy (44 more were: there the two agree by construction) by
+how far GLOBathy's model maximum is from it. The model is within a factor of two for 59 % of these lakes and
+within a quarter for 20 %; it makes lakes under 1 km² 1.38 times too deep on the median, and lakes of
+100 km² and more 1.37 times.
+
+Two tools sit under the colour key: **Compare** puts the water of up to four lakes on one chart, each against its own
+usual volume; **Show the numbers** adds every value of a lake or river with its source, and CSV downloads (the
+numbers, water by year, the bed shape, every SWOT pass).
 
 Click a river to see the same kind of answer for it:
 
@@ -79,6 +89,8 @@ data and code; the Global Surface Water Explorer shows water extent, not depth.
 |---|---|---|
 | Lake outlines, area, volume and depth, volume source | [HydroLAKES v1.0](https://www.hydrosheds.org/products/hydrolakes), Messager et al. (2016) | CC BY 4.0 |
 | Modelled depth, mean depth and area-depth curve of every lake | [GLOBathy](https://doi.org/10.6084/m9.figshare.13402070), Khazaei et al. (2022) Scientific Data | CC0 |
+| Catchment outlines | [HydroBASINS v1c](https://www.hydrosheds.org/products/hydrobasins) level 8, Lehner and Grill (2013) | CC BY 4.0 |
+| Water level of the largest lakes since 1992 (radar altimetry) | [NASA GSFC Global Water Monitor](https://earth.gsfc.nasa.gov/gwm/lake/Index), formerly USDA G-REALM | US Government work |
 | Water-level band seen by ICESat-2 and Landsat (L1) | [3D-LAKES](https://doi.org/10.5281/zenodo.13107867), Huang et al. (2025) Scientific Data | CC BY 4.0 |
 | Names (125,598 lakes) and published depths (7,616 lakes) | [Wikidata](https://www.wikidata.org) via [QLever](https://qlever.dev), matched when the item's point is inside the lake | CC0 |
 | Rivers, flow at least 5 m³/s; downstream paths | [HydroRIVERS v1.0](https://www.hydrosheds.org/products/hydrorivers), Lehner and Grill (2013) | CC BY 4.0 |
@@ -156,6 +168,11 @@ site lets browsers cache files for a week.
   more than 10 m from the rest (a bank or a bridge); real floods of several metres stay in. Some noise remains. SWORD's
   own per-stretch level range is not shown: it includes poor passes (6.7 m for the Rhône, against 0.5 m in the
   filtered passes at Avignon).
+- Catchment outlines are made of HydroBASINS level-8 units, a few hundred km² each, so they are rough near the outlet,
+  and a big lake with several inflows shows the catchment of the unit at its outlet only (the Caspian's outline is the
+  Volga's; its area, 1.4 million km², is HydroLAKES' own and complete).
+- GLOBathy is itself a model; for 44 lakes it uses a published maximum depth, and those are left out of the model
+  error figures.
 - GloLakes leaves out the largest lakes (the Caspian, the Great Lakes, Baikal and others), so they have no water
   record here. Its volumes come mostly from the lake's extent in Landsat images; the year-to-year ups and downs are
   more reliable than the absolute amount.

@@ -76,11 +76,15 @@ def main() -> None:
     m = lakes.dropna(subset=["max"]).set_index("Hylak_id")
     m = m[m["max"] > 0].join(g[["dmax"]], how="inner")
     m = m[m["dmax"] > 0]
+    # GLOBathy takes a published maximum depth as its own for some lakes (the Caspian's 1,025 m): there the agreement is
+    # not a test of the model, so those lakes are listed (flag 1) but left out of the statistics
+    same = (m["dmax"] - m["max"]).abs() < 0.5
+    err = {str(int(i)): [round(float(p), 1), round(float(q), 1), int(s)] for i, p, q, s in zip(m.index, m["max"], m["dmax"], same)}
+    m = m[~same]
     ratio = m["dmax"] / m["max"]
-    err = {str(int(i)): [round(float(p), 1), round(float(q), 1)] for i, p, q in zip(m.index, m["max"], m["dmax"])}
     lr = np.log10(ratio)
     stats = {
-        "n": int(len(m)),
+        "n": int(len(m)), "sameAsPublished": int(same.sum()),
         "medianRatio": round(float(np.median(ratio)), 3),
         "withinFactor2": round(float(np.mean(np.abs(lr) <= np.log10(2))), 3),
         "withinFactor1_25": round(float(np.mean(np.abs(lr) <= np.log10(1.25))), 3),

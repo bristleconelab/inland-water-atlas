@@ -20,6 +20,8 @@ describe('lake bed shape', () => {
     expect(shapeWords(cone, 9)[2]).toContain('within a quarter');
     expect(shapeWords(cone, 40)[2]).toContain('4.0 times shallower');
     expect(shapeWords(cone, 2)[2]).toContain('5.0 times deeper');
+    expect(shapeWords(cone, 10, true)[2]).toContain('agree by construction');
+    expect(shapeWords({ g: [2, 1, 10, 3], o: [0, 100, 1, 99, 2, 98] }).length).toBe(1); // a 2 cm band says nothing
   });
   it('draws the model as a line and each observation as a dot with a tooltip', () => {
     const svg = shapeChart(cone);

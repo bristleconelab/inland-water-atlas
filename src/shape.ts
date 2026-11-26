@@ -2,7 +2,7 @@
 // traced (3D-LAKES L1), from pipeline/build_shape.py. Pure parts are tested in test/shape.test.ts.
 
 export interface Shape { g: [number, number, number, number]; o?: number[] }
-export interface ModelError { stats: { n: number; medianRatio: number; withinFactor2: number; withinFactor1_25: number }; lakes: Record<string, [number, number]> }
+export interface ModelError { stats: { n: number; sameAsPublished: number; medianRatio: number; withinFactor2: number; withinFactor1_25: number }; lakes: Record<string, [number, number, number]> }
 
 /** Model curve as [depth below the surface m, area km2] from the surface down to the bottom. */
 export function modelCurve(s: Shape, steps = 24): [number, number][] {
@@ -26,12 +26,14 @@ export function observed(s: Shape): [number, number][] {
 const n1 = (x: number) => (x < 10 ? x.toFixed(1) : Math.round(x).toLocaleString('en-US'));
 
 /** What the panel says: the model's depths, the band satellites saw, and how far the model is from a published maximum. */
-export function shapeWords(s: Shape, publishedMax?: number): string[] {
+export function shapeWords(s: Shape, publishedMax?: number, reused = false): string[] {
   const [, , dmax, dmean] = s.g;
   const out = [`GLOBathy, a model, makes it ${n1(dmax)} m deep at most and ${n1(dmean)} m on average.`];
   const obs = observed(s);
-  if (obs.length >= 3) out.push(`Satellites traced its shoreline over the top ${n1(Math.max(...obs.map((p) => p[0])))} m (dots); the rest of the curve is the model.`);
-  if (publishedMax && publishedMax > 0) {
+  if (obs.length >= 3 && Math.max(...obs.map((p) => p[0])) >= 0.05) out.push(`Satellites traced its shoreline over the top ${n1(Math.max(...obs.map((p) => p[0])))} m (dots); the rest of the curve is the model.`);
+  if (publishedMax && publishedMax > 0 && reused) {
+    out.push(`GLOBathy uses the published maximum depth (${n1(publishedMax)} m) as its own here, so the two agree by construction: this is not a test of the model.`);
+  } else if (publishedMax && publishedMax > 0) {
     const r = dmax / publishedMax;
     out.push(r >= 0.8 && r <= 1.25
       ? `The published maximum depth is ${n1(publishedMax)} m: the model is within a quarter of it.`

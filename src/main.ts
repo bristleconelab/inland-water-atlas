@@ -9,6 +9,9 @@ import { levelChart, levelSummary, riverEnd, riverFacts, riverLines, riverRecord
 import { trend, trendWords } from './trend';
 import { errorColor, lakeShape, modelCurve, modelError, observed, shapeChart, shapeWords } from './shape';
 import { download, scientist, tableHTML, toCSV, type Row } from './sci';
+import { basinOf, basinRings, basinWords, type Basin } from './basin';
+import { addItem, COLORS, compareChart, type Item } from './compare';
+import { lakeLevel, levelWords, levelYearsChart } from './levels';
 import { mergeHits, prefixSearch, riverSearch, type RiverIndex, type SearchIndex } from './search';
 
 const $ = <T extends HTMLElement>(s: string) => document.querySelector(s) as T;
@@ -55,12 +58,12 @@ $<HTMLInputElement>('#error-on').addEventListener('change', async (e) => {
   errorView = (e.target as HTMLInputElement).checked;
   const me = await modelError(TILES);
   if (!me || !map) return;
-  for (const [id, [pub, mod]] of Object.entries(me.lakes))
-    map.setFeatureState({ source: 'atlas', sourceLayer: 'lakes', id: Number(id) }, { err: errorView, c: errorColor(mod, pub) });
+  for (const [id, [pub, mod, same]] of Object.entries(me.lakes)) // a reused published depth is no test: left grey
+    if (!same) map.setFeatureState({ source: 'atlas', sourceLayer: 'lakes', id: Number(id) }, { err: errorView, c: errorColor(mod, pub) });
   map.setPaintProperty('lakes', 'fill-color', errorView ? ['case', ['boolean', ['feature-state', 'err'], false], ['feature-state', 'c'], '#3a4650'] : LAKE_COLOR);
   map.setPaintProperty('lakes', 'fill-opacity', errorView ? ['case', ['boolean', ['feature-state', 'err'], false], 1, 0.35] : LAKE_OPACITY);
   $('#error-note').hidden = !errorView;
-  $('#error-note').textContent = `${fmt(me.stats.n)} lakes have a published maximum depth. GLOBathy's model is within a factor of two for ${Math.round(me.stats.withinFactor2 * 100)} % of them and within a quarter for ${Math.round(me.stats.withinFactor1_25 * 100)} %. Blue: the model is too shallow; red: too deep.`;
+  $('#error-note').textContent = `${fmt(me.stats.n)} lakes have a published maximum depth that GLOBathy did not use itself (${me.stats.sameAsPublished} more it did). Its model is within a factor of two for ${Math.round(me.stats.withinFactor2 * 100)} % of them and within a quarter for ${Math.round(me.stats.withinFactor1_25 * 100)} %. Blue: the model is too shallow; red: too deep.`;
 });
 $<HTMLInputElement>('#sci-on').checked = scientist.on;
 $<HTMLInputElement>('#sci-on').addEventListener('change', (e) => {
@@ -96,12 +99,13 @@ function showLake(p: LakeProps, at: [number, number]) {
   const links = el('p', 'links');
   if (p.q) { const a = el('a', '', 'Wikidata item') as HTMLAnchorElement; a.href = `https://www.wikidata.org/wiki/${p.q}`; a.target = '_blank'; a.rel = 'noopener'; links.append(a); }
   links.append(el('span', 'fine', `HydroLAKES id ${p.id}`));
-  const flowBox = el('section', 'more'), waterBox = el('section', 'more'), shapeBox = el('section', 'more');
+  const flowBox = el('section', 'more'), basinBox = el('section', 'more'), levelBox = el('section', 'more'), waterBox = el('section', 'more'), shapeBox = el('section', 'more');
   const sciBox = el('section', 'more sci');
-  body.append(flowBox, waterBox, shapeBox, sciBox, links);
+  body.append(flowBox, basinBox, levelBox, waterBox, shapeBox, sciBox, links);
   if (p.tier === 1) body.append(el('p', 'fine', 'Know a published depth for this lake? Adding it to the lake’s Wikidata item (with a source) will show it here after the next update.'));
   panel.hidden = false;
   setFlow(null);
+  setBasin(null);
   const token = ++shown;
   if (scientist.on) lakeNumbers(p, sciBox); // after the token: it checks it when its data arrive
   lakeFlow(TILES, p.id).then((f) => {
@@ -118,12 +122,22 @@ function showLake(p: LakeProps, at: [number, number]) {
       flowBox.append(b, el('p', 'fine', 'Along HydroRIVERS, from where the lake drains, simplified to about 2 km.'));
     }
   });
-  lakeShape(TILES, p.id).then((s) => {
+  basinOf(TILES, 'L', p.id).then((b) => { if (token === shown && b) fillBasin(basinBox, b, 'lake'); });
+  lakeLevel(TILES, p.id).then((l) => {
+    if (token !== shown || !l) return;
+    const tr = trend(l.y0, l.v);
+    levelBox.append(el('h3', '', 'Its water level since ' + l.y0), el('p', '', levelWords(l, tr)));
+    const chart = el('div', 'spark'); chart.innerHTML = levelYearsChart(l, 300, 84, tr ?? undefined); // numbers only
+    const axis = el('div', 'spark-axis'); axis.append(el('span', '', String(l.y0)), el('span', '', String(l.y0 + l.v.length - 1)));
+    levelBox.append(chart, axis, el('p', 'fine', `Radar altimetry (TOPEX/Poseidon, Jason-1, 2 and 3, Sentinel-6), yearly median of ${l.passes.toLocaleString('en-US')} passes over the “${l.n}” stretch, against its reference level; typical error ${Math.round(l.err * 100)} cm a pass. NASA GSFC Global Water Monitor (G-REALM).`));
+  });
+  Promise.all([lakeShape(TILES, p.id), modelError(TILES)]).then(([s, me]) => {
     if (token !== shown || !s) return;
+    const reused = !!me?.lakes[String(p.id)]?.[2];
     shapeBox.append(el('h3', '', 'The shape of its bed'));
     const chart = el('div', 'spark shape'); chart.innerHTML = shapeChart(s); // numbers only (src/shape.ts)
     shapeBox.append(chart);
-    for (const line of shapeWords(s, p.wx)) shapeBox.append(el('p', 'fine', line));
+    for (const line of shapeWords(s, p.wx, reused)) shapeBox.append(el('p', 'fine', line));
   });
   lakeWater(TILES, p.id).then((w) => {
     if (token !== shown || !w) return;
@@ -138,9 +152,43 @@ function showLake(p: LakeProps, at: [number, number]) {
     const axis = el('div', 'spark-axis');
     axis.append(el('span', '', String(w.y0)), el('span', '', String(w.y0 + w.v.length - 1)));
     waterBox.append(chart, axis, el('p', 'fine', 'Water volume by year, estimated mostly from the lake’s extent in Landsat images (GloLakes). Trust the ups and downs more than the exact amount.'));
+    const cb = el('button', 'btn-small', 'Compare with other lakes');
+    cb.addEventListener('click', () => { compared = addItem(compared, { id: p.id, name: p.n || `Lake ${p.id}`, w }); drawCompare(); });
+    waterBox.append(cb);
   });
 }
 let shown = 0;
+
+// ---------- compare up to four lakes (src/compare.ts) ----------
+let compared: Item[] = [];
+function drawCompare() {
+  const box = $('#compare');
+  box.hidden = !compared.length;
+  $('#compare-chart').innerHTML = compareChart(compared); // numbers and escaped names only
+  const list = $('#compare-list');
+  list.replaceChildren();
+  compared.forEach((it, k) => {
+    const li = el('li');
+    const sw = el('span', 'sw'); sw.style.background = COLORS[k % COLORS.length];
+    const tr = trend(it.w.y0, it.w.v);
+    const words = tr && tr.level > 0 ? `${((tr.slope * 1000) / tr.level).toFixed(1)} % a decade, p ${tr.p < 0.001 ? '< 0.001' : `= ${tr.p.toFixed(3)}`}` : 'too short for a trend';
+    const rm = el('button', 'link', 'remove');
+    rm.addEventListener('click', () => { compared = compared.filter((x) => x.id !== it.id); drawCompare(); });
+    li.append(sw, el('span', 'hn', it.name), el('span', 'ha', words), rm);
+    list.append(li);
+  });
+}
+
+function setBasin(b: Basin | null) {
+  const src = map?.getSource('basin') as GeoJSONSource | undefined;
+  src?.setData({ type: 'FeatureCollection', features: b ? [{ type: 'Feature', properties: {}, geometry: { type: 'MultiPolygon', coordinates: basinRings(b).map((r) => [r]) } }] : [] });
+}
+function fillBasin(box: HTMLElement, b: Basin, kind: 'lake' | 'river') {
+  box.append(el('h3', '', 'Where its water comes from'), el('p', '', basinWords(b, kind)));
+  const btn = el('button', 'btn-small', 'Show its catchment');
+  btn.addEventListener('click', () => { setBasin(b); fitTo(basinRings(b).flat()); });
+  box.append(btn, el('p', 'fine', 'Outline from HydroBASINS level 8 (units of a few hundred km², so it is rough near the outlet); the area is HydroLAKES’ or HydroRIVERS’ own.'));
+}
 
 /** The numbers view of a lake: every value with its source, and downloads (src/sci.ts). */
 async function lakeNumbers(p: LakeProps, box: HTMLElement) {
@@ -196,6 +244,7 @@ function openRiver(rid: number | null, reach: Reach | null, frame: boolean) {
   body.replaceChildren();
   setFlow(null);
   setSelected([]);
+  setBasin(null);
   const token = ++shown;
   const badge = el('p', 'badge', 'River'); badge.style.background = RIVER_COLOR;
   const title = el('h2', rid ? '' : 'unnamed', rid ? reach?.n ?? 'River' : 'River without a name');
@@ -272,6 +321,10 @@ function fillRiver(r: River, rid: number, title: HTMLElement, meta: HTMLElement,
     wayBox.append(b);
   }
   wayBox.append(el('p', 'fine', 'Name from OpenStreetMap through SWORD; length, flow and course from HydroRIVERS.'));
+  const basinBox = el('div', '');
+  wayBox.append(basinBox);
+  const tok = shown;
+  basinOf(TILES, 'R', rid).then((b) => { if (tok === shown && b) fillBasin(basinBox, b, 'river'); });
   if (scientist.on) {
     const rows: Row[] = [
       ['River id (HYRIV_ID of its last reach)', rid, 'HydroRIVERS'], ['Name', r.n, 'SWORD / Wikidata English label'], ['Local name', r.l, 'SWORD (OpenStreetMap)'],
@@ -329,11 +382,13 @@ function closePanel() {
   panel.hidden = true;
   shown++;
   setFlow(null);
+  setBasin(null);
   (map?.getSource('selected') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: [] });
   map?.setFilter('selected-lake', ['==', ['get', 'id'], -1]);
   history.replaceState(null, '', location.pathname);
 }
 panel.querySelector('.close')!.addEventListener('click', closePanel);
+$('#compare .close').addEventListener('click', () => { compared = []; drawCompare(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !panel.hidden && !document.querySelector('dialog[open]')) closePanel(); });
 
 /** Fly to a lake and open it once its tiles are on screen. */

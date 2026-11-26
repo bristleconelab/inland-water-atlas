@@ -44,6 +44,7 @@ export async function createMap(container: HTMLElement): Promise<maplibregl.Map>
       atlas: { type: 'vector', url: `pmtiles://${archive.base}`, promoteId: { lakes: 'id' }, attribution: 'Lakes: HydroLAKES, 3D-LAKES, Wikidata; rivers: HydroRIVERS, SWORD (names © OpenStreetMap contributors)' },
       selected: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
       flow: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+      basin: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
     },
     layers: [
       { id: 'bg', type: 'background', paint: { 'background-color': '#0c1a24' } },
@@ -65,6 +66,9 @@ export async function createMap(container: HTMLElement): Promise<maplibregl.Map>
           'fill-antialias': true,
         },
       },
+      // the catchment of the chosen lake or river, under the lakes so they stay readable
+      { id: 'basin-fill', type: 'fill', source: 'basin', paint: { 'fill-color': '#9ad1ff', 'fill-opacity': 0.12 } },
+      { id: 'basin-line', type: 'line', source: 'basin', paint: { 'line-color': '#9ad1ff', 'line-width': 1.4, 'line-opacity': 0.8 } },
       { id: 'lakes-edge', type: 'line', source: 'atlas', 'source-layer': 'lakes', minzoom: 7, paint: { 'line-color': '#0c1a24', 'line-width': 0.4, 'line-opacity': 0.5 } },
       { id: 'flow-glow', type: 'line', source: 'flow', filter: ['==', ['geometry-type'], 'LineString'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': FLOW_COLOR, 'line-width': 7, 'line-opacity': 0.25, 'line-blur': 3 } },
       { id: 'flow', type: 'line', source: 'flow', filter: ['==', ['geometry-type'], 'LineString'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': FLOW_COLOR, 'line-width': 2.4, 'line-dasharray': [2, 1.5] } },
