@@ -9,7 +9,7 @@
   "3": 1420699
  },
  "wikidataDepth": 7616,
- "named": 125597,
+ "named": 125598,
  "seenMedianM": 0.6593418121337109,
  "areaShareKnown": 0.5784301360391575,
  "byAreaClass": {
@@ -33,6 +33,6 @@
  "sources": {
   "hydrolakes": "Messager et al. 2016, HydroLAKES v1.0, CC BY 4.0",
   "3dlakes": "Huang et al. 2025, 3D-LAKES, Zenodo 10.5281/zenodo.13107867, CC BY 4.0",
-  "wikidata": "Wikidata via QLever, CC0, fetched 2026-11-25"
+  "wikidata": "Wikidata via QLever, CC0, fetched 2026-11-26"
  }
 }

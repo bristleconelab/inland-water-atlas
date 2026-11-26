@@ -42,7 +42,7 @@ PREFIX = ("PREFIX wdt: <http://www.wikidata.org/prop/direct/> PREFIX wd: <http:/
           "PREFIX p: <http://www.wikidata.org/prop/> PREFIX ps: <http://www.wikidata.org/prop/statement/> "
           "PREFIX pq: <http://www.wikidata.org/prop/qualifier/> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> "
           "PREFIX schema: <http://schema.org/> PREFIX psn: <http://www.wikidata.org/prop/statement/value-normalized/> "
-          "PREFIX wikibase: <http://wikiba.se/ontology#> ")
+          "PREFIX wikibase: <http://wikiba.se/ontology#> PREFIX prov: <http://www.w3.org/ns/prov#> ")
 # P1013 "criterion used" values seen on lake depths (QLever, 2026-11-25): average Q202785 (1,274), lowest point Q30278109
 # (697), maximum Q10578722 (695), mean Q2796622, average Q54835811, arithmetic mean Q19033
 WD = "http://www.wikidata.org/entity/"
@@ -63,7 +63,7 @@ def sparql(q: str) -> list[dict]:
 
 
 def wikidata() -> pd.DataFrame:
-    cache = RAW / "wikidata_lakes.parquet"
+    cache = RAW / "wikidata_lakes_v2.parquet"  # v2: depth ranks and references
     if cache.exists():
         return pd.read_parquet(cache)
     rows = sparql("""SELECT ?l ?coord (SAMPLE(?name) AS ?label) (SAMPLE(?art) AS ?article) WHERE {
@@ -80,19 +80,30 @@ def wikidata() -> pd.DataFrame:
     pt = d["coord"].str.extract(r"^POINT\(([-\d.eE]+) ([-\d.eE]+)\)$", flags=re.IGNORECASE).astype(float)
     d["lon"], d["lat"] = pt[0], pt[1]
     d["qid"] = d["l"].str.rsplit("/", n=1).str[-1]
-    depths = sparql("""SELECT ?l ?d ?crit WHERE {
+    # every depth statement with its rank and whether it cites a source. Deprecated statements (marked wrong by
+    # editors) are left out; where an item has a preferred one, only those count; several values of one kind give
+    # their median, not the largest (the largest is often a typo or a dam height)
+    depths = sparql("""SELECT ?l ?st ?d ?crit ?rank (COUNT(?ref) AS ?refs) WHERE {
       { ?l wdt:P31/wdt:P279* wd:Q23397 } UNION { ?l wdt:P31/wdt:P279* wd:Q131681 }
-      ?l p:P4511 ?st . ?st psn:P4511 ?nv . ?nv wikibase:quantityAmount ?d . OPTIONAL { ?st pq:P1013 ?crit } }""")
+      ?l p:P4511 ?st . ?st psn:P4511 ?nv . ?nv wikibase:quantityAmount ?d . ?st wikibase:rank ?rank .
+      FILTER(?rank != wikibase:DeprecatedRank)
+      OPTIONAL { ?st pq:P1013 ?crit } OPTIONAL { ?st prov:wasDerivedFrom ?ref } } GROUP BY ?l ?st ?d ?crit ?rank""")
     dd = pd.DataFrame([{k: v["value"] for k, v in b.items()} for b in depths])
     dd["qid"] = dd["l"].str.rsplit("/", n=1).str[-1]
     dd["d"] = pd.to_numeric(dd["d"], errors="coerce")  # normalised to metres
+    dd["ref"] = pd.to_numeric(dd["refs"], errors="coerce").fillna(0) > 0
+    dd["pref"] = dd["rank"].str.endswith("PreferredRank")
     crit = dd["crit"] if "crit" in dd else pd.Series("", index=dd.index)
     dd["kind"] = np.select([crit.isin(MEAN_DEPTH), crit.isin(MAX_DEPTH)], ["mean", "max"], "unspecified")
-    best = (dd.dropna(subset=["d"]).sort_values("d", ascending=False)
-              .groupby(["qid", "kind"])["d"].first().unstack())  # one value per kind
+    dd = dd.dropna(subset=["d"])
+    dd = dd[dd["pref"] | ~dd.groupby(["qid", "kind"])["pref"].transform("any")]  # preferred ones win
+    g = dd.groupby(["qid", "kind"])
+    best = g["d"].median().unstack()
+    best = best.join(g["ref"].all().groupby("qid").all().rename("cited"), how="left")
     d = d.merge(best, left_on="qid", right_index=True, how="left")
-    keep = ["qid", "label", "article", "lon", "lat"] + [c for c in ("mean", "max", "unspecified") if c in d]
-    print(f"  depth statements: {len(dd):,}, numeric {dd['d'].notna().sum():,}; kinds {dd['kind'].value_counts().to_dict()}")
+    keep = ["qid", "label", "article", "lon", "lat", "cited"] + [c for c in ("mean", "max", "unspecified") if c in d]
+    print(f"  depth statements kept: {len(dd):,}; preferred {int(dd['pref'].sum()):,}; cited {int(dd['ref'].sum()):,}; "
+          f"kinds {dd['kind'].value_counts().to_dict()}")
     d = d.dropna(subset=["lon", "lat"])[keep].drop_duplicates("qid")
     print(f"  Earth items with coordinates: {len(d):,}")
     d.to_parquet(cache)
@@ -126,7 +137,7 @@ def main() -> None:
     # several items can fall in one lake (islands, bays): prefer an item with a depth, then one with an article
     j["score"] = j[[c for c in ("mean", "max", "unspecified") if c in j]].notna().any(axis=1) * 2 + j["article"].notna()
     j = j.sort_values(["Hylak_id", "score"], ascending=[True, False]).drop_duplicates("Hylak_id")
-    cols = ["Hylak_id", "qid", "label", "article"] + [c for c in ("mean", "max", "unspecified") if c in j]
+    cols = ["Hylak_id", "qid", "label", "article", "cited"] + [c for c in ("mean", "max", "unspecified") if c in j]
     lakes = lakes.merge(pd.DataFrame(j[cols]), on="Hylak_id", how="left")
     print(f"Wikidata: {len(wd):,} items, {len(j):,} matched to a lake")
 
@@ -163,13 +174,17 @@ def main() -> None:
         "d": lakes["Depth_avg"].round(1), "v": lakes["Vol_total"].round(1), "vs": lakes["Vol_src"].astype("int8"),
         "e": lakes["Elevation"].round(0), "s": lakes["seen_m"].round(2),
         "wm": lakes.get("mean"), "wx": lakes.get("max"), "wu": lakes.get("unspecified"), "q": lakes["qid"],
+        # wr: 1 when every Wikidata depth of the lake cites a source, 0 when one does not (shown as such in the panel)
+        "wr": np.where(lakes[[c for c in ("mean", "max", "unspecified") if c in lakes]].notna().any(axis=1),
+                       lakes["cited"].fillna(False).astype(int), np.nan),
     }, geometry=lakes.geometry, crs=lakes.crs)
     for k in ("wm", "wx", "wu"):
         if k in poly:
             poly[k] = poly[k].round(1)
     poly.to_file(OUT / "lakes_polys.geojsonl", driver="GeoJSONSeq", engine="pyogrio")
     named = lakes[lakes["name"] != ""]
-    lab = gpd.GeoDataFrame({"id": named["Hylak_id"], "name": named["name"], "a": named["Lake_area"].round(1), "tier": named["tier"]},
+    lab = gpd.GeoDataFrame({"id": named["Hylak_id"], "name": named["name"], "a": named["Lake_area"].round(1), "tier": named["tier"],
+                            "c": named["Country"]},
                            geometry=named.geometry.representative_point(), crs="EPSG:4326")
     lab.to_file(OUT / "lakes_points.geojsonl", driver="GeoJSONSeq", engine="pyogrio")
     print(f"done in {time.time() - t0:.0f} s")

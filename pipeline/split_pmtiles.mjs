@@ -31,7 +31,7 @@ for (const spec of specs) {
   const h = createHash('sha256');
   for (let i = 0; i < count; i++) h.update(readFileSync(join(dir, `${String(i).padStart(5, '0')}.bin`)));
   if (h.digest('hex') !== whole) { console.error(`${layer}: pieces do not join back to the archive`); process.exit(1); }
-  manifest[layer] = { base: `hires/${name}/`, size, chunk, count, sha256: whole, ...(source ? { source } : {}) };
+  manifest[layer] = { base: `${name}/`, size, chunk, count, sha256: whole, ...(source ? { source } : {}) };
   console.log(`${layer}: ${size} bytes -> ${count} pieces of ${chunk} bytes, sha256 ${whole.slice(0, 12)}…`);
 }
 writeFileSync(join(out, 'manifest.json'), JSON.stringify(manifest, null, 1));

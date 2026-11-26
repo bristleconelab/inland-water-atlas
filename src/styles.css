@@ -1,4 +1,4 @@
-/* Lake Atlas. Dark, desaturated land so the lakes carry the picture; yellow = published, cyan = seen from space,
+/* Inland Water Atlas. Dark, desaturated land so the lakes carry the picture; yellow = published, cyan = seen from space,
    pale lilac = model only. Bricolage for the interface, Source Serif for the per-lake sentences. */
 :root {
   --night: #0c1a24; --night-2: #13242f; --ink: #eef3f5; --muted: #9db0ba; --line: rgb(238 243 245 / 0.13);
@@ -20,7 +20,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 .masthead { position: fixed; top: 16px; left: 18px; z-index: 4; width: min(380px, calc(100vw - 36px)); }
 .masthead h1 { margin: 0; font-size: 38px; line-height: 0.95; font-weight: 800; letter-spacing: -0.035em; font-variation-settings: 'wdth' 78, 'opsz' 96; text-shadow: 0 2px 14px rgb(0 0 0 / 0.5); }
-.sub { margin: 6px 0 12px; color: var(--muted); }
+.sub { margin: 6px 0 12px; color: #c9d6dd; text-shadow: 0 1px 2px rgb(0 0 0 / 0.9), 0 0 12px rgb(0 0 0 / 0.8); } /* readable over yellow lakes */
 .search { position: relative; }
 #search { width: 100%; height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 22px; background: rgb(19 36 47 / 0.92); color: var(--ink); font: 16px var(--sans); }
 #search::placeholder { color: #8098a5; }
@@ -41,11 +41,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .cnt { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
 .link { border: 0; background: none; padding: 0; color: var(--t2); text-decoration: underline; font-size: 13.5px; }
 
-#hint { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 3; margin: 0; padding: 8px 16px; border-radius: 20px; background: rgb(12 26 36 / 0.8); color: var(--muted); pointer-events: none; }
+#hint { position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 3; margin: 0; padding: 8px 16px; border-radius: 20px; background: rgb(12 26 36 / 0.8); color: var(--muted); pointer-events: none; }
 
-#panel { position: fixed; z-index: 5; top: 14px; right: 14px; width: 380px; max-height: calc(100vh - 28px); display: flex; flex-direction: column; border-radius: 18px; background: var(--night-2); border: 1px solid var(--line); box-shadow: 0 18px 48px rgb(0 0 0 / 0.5); }
+#panel { position: fixed; z-index: 5; top: 14px; right: 14px; width: 380px; max-height: calc(100vh - 118px); /* clear of the zoom buttons and the attribution */ display: flex; flex-direction: column; border-radius: 18px; background: var(--night-2); border: 1px solid var(--line); box-shadow: 0 18px 48px rgb(0 0 0 / 0.5); }
 .panel-body { overflow-y: auto; padding: 20px 22px; }
-.close { position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; border: 0; border-radius: 50%; background: rgb(238 243 245 / 0.08); font-size: 20px; line-height: 1; }
+.close { position: absolute; z-index: 2; top: 10px; right: 10px; width: 34px; height: 34px; border: 0; border-radius: 50%; background: #233540; box-shadow: 0 0 0 6px var(--night-2); /* solid, so scrolled text slides under it */ font-size: 20px; line-height: 1; }
 .badge { display: inline-block; margin: 0; padding: 2px 10px; border-radius: 10px; font-size: 12.5px; font-weight: 650; color: #10202a; }
 #panel h2 { margin: 6px 40px 4px 0; font-size: 30px; line-height: 1.05; letter-spacing: -0.025em; font-variation-settings: 'wdth' 82, 'opsz' 96; }
 #panel h2.unnamed { color: var(--muted); font-weight: 600; }
@@ -82,3 +82,4 @@ dialog p, dialog li { max-width: 68ch; } .sources li, dialog ul li { margin-bott
 .btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px; }
 .spark.level { color: #7fb6e8; }
 .more .link { display: block; margin: 2px 0 8px; }
+#hits li.none { display: block; color: var(--muted); cursor: default; }

@@ -16,7 +16,11 @@ Records (out/v2/river/NNN.json, 128 shards by river id % 128; the id is the HYRI
   n name, l local name, km length (to its farthest source, or to where it continues another named river, fromName),
   q mean flow at the end (m3/s), up drainage area (km2), g geometry (parts of 0.01 degree steps), p path from its end
   to the sea, dkm distance on to the sea, then where it ends: into (river id) + intoName, or sea, or endo + sinkName;
-  w width (m, from Landsat), swot = [stretches seen, level range p10-p90 in m, width m], wd its Wikidata item.
+  w width (m, from Landsat), swot = [stretches SWOT has measured at least 5 times, their median width seen by SWOT in m],
+  wd its Wikidata item. When the item is found, the name shown is its English label (Chang Jiang -> Yangtze).
+  SWORD's per-stretch level range (wse_obs_range, p90 - p10) is NOT used: it includes passes of poor quality and gave
+  6.7 m for the Rhone where the quality-filtered passes at Avignon move 0.5 m; the panel shows the live, filtered
+  record instead.
 Also out/river_names.geojsonl (one line per river, for labels) and out/rivers.geojsonl for the tiles (id, o, q, n,
 r = river id, or d = the first named river downstream, s = the SWORD reach SWOT has seen most often there).
 The search index comes from the records: build_search_rivers.py.
@@ -32,7 +36,6 @@ import time
 import unicodedata
 import urllib.parse
 import urllib.request
-import zipfile
 from collections import Counter, defaultdict
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -41,6 +44,8 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import shapely
+
+from seas import marine_areas, sea_names
 
 RAW, OUT = Path("raw"), Path("out")
 SHARDS = 128
@@ -53,11 +58,11 @@ WD_RIVERS = """PREFIX wd: <http://www.wikidata.org/entity/>
 PREFIX wdt: <http://www.wikidata.org/prop/direct/>
 PREFIX wikibase: <http://wikiba.se/ontology#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-SELECT ?item ?sl ?coord (GROUP_CONCAT(DISTINCT ?l; SEPARATOR="|") AS ?labels) WHERE {
+SELECT ?item ?sl ?coord (SAMPLE(?enl) AS ?en) (GROUP_CONCAT(DISTINCT ?l; SEPARATOR="|") AS ?labels) WHERE {
   ?item wdt:P31 wd:Q4022 . ?item wikibase:sitelinks ?sl . FILTER(?sl >= 5)
   OPTIONAL { ?item wdt:P625 ?coord } ?item rdfs:label ?l .
+  OPTIONAL { ?item rdfs:label ?enl FILTER(LANG(?enl) = "en") }
 } GROUP BY ?item ?sl ?coord"""
-NE_MARINE = "https://naciscdn.org/naturalearth/10m/physical/ne_10m_geography_marine_polys.zip"
 GENERIC = re.compile(r"\b(river|rio|rivière|riviere|fleuve|fluss|reka|река|rivier|rivière|the)\b")
 
 
@@ -85,7 +90,7 @@ def encode(coords: np.ndarray) -> list[int]:
 
 def wikidata_rivers() -> dict[str, dict]:
     """Rivers with Wikipedia articles in at least 5 languages: their labels in every language and their points."""
-    f = RAW / "wd_rivers.tsv"
+    f = RAW / "wd_rivers_v2.tsv"  # v2: with the English label
     if not f.exists():
         req = urllib.request.Request(QLEVER, data=urllib.parse.urlencode({"query": WD_RIVERS}).encode(),
                                      headers={"Accept": "text/tab-separated-values", "User-Agent": "lakes-atlas-pipeline"})
@@ -93,14 +98,15 @@ def wikidata_rivers() -> dict[str, dict]:
     items: dict[str, dict] = {}
     for line in f.read_text().splitlines()[1:]:
         c = line.split("\t")
-        if len(c) < 4:
+        if len(c) < 5:
             continue
         q = c[0].rsplit("/", 1)[-1].rstrip(">")
-        it = items.setdefault(q, {"sl": int(c[1].split("^")[0].strip('"') or 0), "pts": [], "keys": set()})
+        en = re.sub(r'^"(.*)"(@en)?$', r"\1", c[3]) if c[3] else ""
+        it = items.setdefault(q, {"sl": int(c[1].split("^")[0].strip('"') or 0), "pts": [], "keys": set(), "en": en})
         m = re.match(r'"?POINT\(([-\d.e]+) ([-\d.e]+)\)', c[2])  # Earth points only (others carry a globe prefix)
         if m:
             it["pts"].append((float(m.group(1)), float(m.group(2))))
-        it["keys"].update(k for k in (key_of(x) for x in c[3].strip('"').split("|")) if k)
+        it["keys"].update(k for k in (key_of(x) for x in c[4].strip('"').split("|")) if k)
     return items
 
 
@@ -245,6 +251,10 @@ def main() -> None:
     canon = np.array([find(a) for a in range(len(keys))])
     KEY[KEY >= 0] = canon[KEY[KEY >= 0]]
     items_raw = {k: set(v) for k, v in items_of.items()}  # by the exact name, before spellings were joined
+    wd_by_key: dict[str, set] = defaultdict(set)  # any label in any language -> items (for local names: 长江, Енисей)
+    for q_, it in wd.items():
+        for k in it["keys"]:
+            wd_by_key[k].add(q_)
     for k in list(items_of):
         items_of[canon[k]] |= items_of[k]
     log(f"spellings joined: {joined:,} ({len(wd):,} Wikidata rivers)")
@@ -411,15 +421,7 @@ def main() -> None:
     lp = gpd.read_file(RAW / "HydroLAKES_polys_v10_shp/HydroLAKES_polys_v10.shp", engine="pyogrio", columns=["Hylak_id", "Lake_area"])
     sink = gpd.sjoin_nearest(op, lp, how="left", max_distance=0.05).sort_values("Lake_area", ascending=False).drop_duplicates("row")
     sink_id = dict(zip(sink["row"], sink["Hylak_id"]))
-    ne = RAW / "ne_10m_geography_marine_polys.zip"
-    if not ne.exists():
-        urllib.request.urlretrieve(NE_MARINE, ne)
-    with zipfile.ZipFile(ne) as z:
-        shp = next(n for n in z.namelist() if n.endswith(".shp"))
-    marine = gpd.read_file(f"zip://{ne}!{shp}", engine="pyogrio", columns=["name"])
-    marine = marine[~marine["name"].fillna("").str.contains(r"\bRiver\b", case=False)]  # "Amazon River" is its mouth, not a sea
-    sea = gpd.sjoin_nearest(op, marine, how="left", distance_col="deg").drop_duplicates("row")
-    sea_name = {r: (n if isinstance(n, str) and n and d <= 2.5 else None) for r, n, d in zip(sea["row"], sea["name"], sea["deg"])}
+    sea_name = sea_names(op, marine_areas(RAW))  # pipeline/seas.py: real seas only, not river mouths ("Canal do Sul")
     endo = rv["ENDORHEIC"].to_numpy()
     log("outlets named")
 
@@ -492,21 +494,42 @@ def main() -> None:
             w = d[:, 0][d[:, 0] > 0]
             if len(w):
                 rec["w"] = round(float(np.median(w)))
-            obs = d[(d[:, 3] >= 5) & (d[:, 1] > -9999) & (d[:, 1] < 50)]  # > 50 m: a dam or a bad stretch
+            obs = d[d[:, 3] >= 5]  # stretches SWOT measured at least 5 times
             if len(obs) >= 3:
                 wo = obs[:, 2][obs[:, 2] > 0]
-                rec["swot"] = [len(obs), round(float(np.median(obs[:, 1])), 1), round(float(np.median(wo))) if len(wo) else None]
-        # its Wikidata item: a river labelled with the name shown (else with any of its joined spellings) whose point
-        # lies within 1.5 degrees of it (the point is often the mouth or the source, beyond the stretch named here)
-        best_q, best_sl = None, -1
+                rec["swot"] = [len(obs), round(float(np.median(wo))) if len(wo) else None]
+        # its Wikidata item. Candidates: rivers labelled (in any language) with one of its main names: a name that is at
+        # least a fifth of the names on its SWORD stretches, English or local, so a tributary's name on a confluence
+        # stretch (乌江 on the Yangtze) brings no candidate. Score: Wikipedia articles, in full when the item's point is
+        # within 1.5 degrees of the river, at half for a well-known river (80 articles or more) within 20 degrees,
+        # because a river's one point is often its source or mouth, beyond the stretch named here (the Yangtze's is in
+        # Tibet, the Yenisey's in Tuva). Sorted by score then id, so the choice is the same on every run.
+        def main_names(c: Counter) -> list[str]:
+            tot = sum(c.values())
+            return [n_ for n_, k_ in c.items() if k_ >= 0.2 * tot]
+        cands = set(items_of.get(KEY[root], ())) | set(items_raw.get(kid.get(key_of(name), -1), ()))
+        for n_ in main_names(disp[root]) + main_names(local[root]):
+            cands |= wd_by_key.get(key_of(n_), set())
         pts_m = XY[mem]
-        cands = items_raw.get(kid.get(key_of(name), -1)) or items_of.get(KEY[root], ())
-        for q_ in cands:
-            it = wd[q_]
-            if it["sl"] > best_sl and any(np.min(np.abs(pts_m - np.array(pt)).max(axis=1)) < 1.5 for pt in it["pts"]):
-                best_q, best_sl = q_, it["sl"]
+        def score(q: str) -> float:
+            it = wd[q]
+            d = min((float(np.min(np.abs(pts_m - np.array(pt)).max(axis=1))) for pt in it["pts"]), default=np.inf)
+            return it["sl"] if d <= 1.5 else it["sl"] * 0.5 if (d <= 20 and it["sl"] >= 80) else 0.0
+        scored = sorted(((score(q), q) for q in cands), key=lambda x: (-x[0], x[1]))
+        best_q = scored[0][1] if scored and scored[0][0] > 0 else None
         if best_q:
             rec["wd"] = best_q
+            en = wd[best_q]["en"]
+            if en and en != rec["n"]:
+                was = rec["n"]
+                rec["n"] = en
+                if rec.get("l") and key_of(rec["l"]) == key_of(en):
+                    del rec["l"]  # the local name was the English one ("Amu Darya")
+                if key_of(was) != key_of(en) and key_of(was) != key_of(rec.get("l", "")):
+                    if rec.get("l"):
+                        rec["aka"] = was  # searchable, not shown ("Chang Jiang" when the local name is 长江)
+                    else:
+                        rec["l"] = was  # "Amudaryo"
         rec["_basin"] = int(out)
         rivers[int(ids[root])] = rec
     # the same name twice at one sea (or one inland basin), not joined: the smaller one with a different local name is shown by that name
@@ -518,8 +541,11 @@ def main() -> None:
             biggest[kk] = rid_
     renamed = 0
     for rid_, rec in rivers.items():
-        basin = rec.pop("_basin")
-        if biggest[(rec.get("sea") or basin, key_of(rec["n"]))] != rid_ and rec.get("l"):
+        big_ = rivers[biggest[(rec.get("sea") or rec["_basin"], key_of(rec["n"]))]]
+        rec.pop("_basin")
+        if big_ is not rec and rec.get("wd") and rec["wd"] == big_.get("wd"):
+            continue  # two pieces of one river (same Wikidata item): both keep its name
+        if big_ is not rec and rec.get("l"):
             rec["n"] = rec.pop("l")
             renamed += 1
     log(f"duplicates shown by their local name: {renamed:,}")

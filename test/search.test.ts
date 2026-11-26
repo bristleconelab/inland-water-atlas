@@ -25,3 +25,12 @@ describe('lakes and rivers together', () => {
     expect(mergeHits(prefixSearch(ix, 'lem'), riverSearch(rivers, 'rh'))[0].kind).toBe('river');
   });
 });
+
+describe('names that repeat', () => {
+  it('lists a river under two names only once, and tells lakes of one name apart by country', () => {
+    const rv: RiverIndex = { n: ['Chirchik', 'Chirchiq'], id: [7, 7], x: [6950, 6950], y: [4130, 4130], q: [220, 220], km: [174, 174] };
+    expect(riverSearch(rv, 'chirch').map((h) => h.id)).toEqual([7]);
+    const lk: SearchIndex = { ...ix, c: ['Kazakhstan', 'United States', 'Peru', 'Switzerland', 'Canada'] };
+    expect(prefixSearch(lk, 'sup')[0].country).toBe('United States');
+  });
+});

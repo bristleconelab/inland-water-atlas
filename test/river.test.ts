@@ -24,7 +24,7 @@ describe('where a river ends', () => {
 
 describe('facts', () => {
   it('marks modelled numbers as modelled and satellite ones as seen', () => {
-    const f = riverFacts({ ...base, w: 390, swot: [12, 3.4, 380] });
+    const f = riverFacts({ ...base, w: 390, swot: [12, 380] });
     expect(f.map((x) => x.kind)).toEqual(['model', 'model', 'model', 'seen']);
     expect(f[1].text).toContain('not a gauge');
     expect(f[3].text).toContain('12 stretches');
@@ -50,10 +50,23 @@ describe('SWOT water level', () => {
     const p = parseLevels(csv);
     expect(p.map((x) => x.h)).toEqual([15.33, 15.38, 14.89, 15.9, 16.4, 15.1]);
   });
+  it('keeps a real flood but drops ice, uncertain heights and far-off bank or bridge echoes', () => {
+    const rows = ['reach_id,time_str,wse,wse_u,reach_q,ice_clim_f'];
+    for (let m = 1; m <= 12; m++) rows.push(`1,2024-${String(m).padStart(2, '0')}-01T00:00:00Z,${m === 7 ? 14.2 : 10.1 + (m % 3) * 0.05},0.1,0,0`);
+    rows.push('1,2024-02-15T00:00:00Z,10.1,0.1,0,2');  // ice cover
+    rows.push('1,2024-03-15T00:00:00Z,10.2,3.5,0,0');  // 3.5 m uncertainty
+    rows.push('1,2024-04-15T00:00:00Z,31.0,0.1,0,0');  // a bridge 21 m above the water
+    rows.push('1,2024-05-15T00:00:00Z,10.2,-999999999999.0,0,0');  // uncertainty not given: kept
+    const p = parseLevels(rows.join('\n'));
+    expect(p).toHaveLength(13);
+    expect(Math.max(...p.map((x) => x.h))).toBe(14.2);  // the monsoon flood, 4 m above a still river
+  });
   it('sums them up in words and draws one dot per measurement', () => {
     const p = parseLevels(csv);
     expect(levelSummary(p)).toMatch(/^Measured 6 times from Jul 2023 to Sep 2024\. The water level here typically moved over 1\.\d m/);
     expect(levelSummary(p.slice(0, 3))).toBeNull();
     expect(levelChart(p).match(/<circle/g)).toHaveLength(6);
+    expect(levelChart(p)).toContain('<title>');  // each dot tells its date and height
+    expect(levelSummary(p)).toContain('above the geoid');
   });
 });

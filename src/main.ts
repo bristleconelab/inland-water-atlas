@@ -21,12 +21,13 @@ async function start() {
   map.on('click', (e) => {
     const at: [number, number] = [e.lngLat.lng, e.lngLat.lat];
     const hit = lakeAt(map, e.point);
-    if (hit) return showLake(hit.props, hit.outline, at);
+    if (hit) return showLake(hit, at);
     const reach = map.getLayoutProperty('rivers', 'visibility') === 'none' ? null : riverAt(map, e.point);
     if (reach) showReach(reach, at); else closePanel();
   });
   map.on('mousemove', (e) => {
-    const on = map.queryRenderedFeatures(e.point, { layers: ['lakes'] }).length || riverAt(map, e.point, 4);
+    const rivers = map.getLayoutProperty('rivers', 'visibility') !== 'none';
+    const on = map.queryRenderedFeatures(e.point, { layers: ['lakes'] }).length || (rivers && riverAt(map, e.point, 4));
     map.getCanvas().style.cursor = on ? 'pointer' : '';
   });
   applyHash();
@@ -51,9 +52,10 @@ $<HTMLInputElement>('#rivers-on').addEventListener('change', (e) => {
 });
 
 // ---------- lake panel ----------
-function showLake(p: LakeProps, outline: GeoJSON.Feature[], at: [number, number]) {
+function showLake(p: LakeProps, at: [number, number]) {
   hint.hidden = true;
-  (map.getSource('selected') as GeoJSONSource).setData({ type: 'FeatureCollection', features: outline });
+  (map.getSource('selected') as GeoJSONSource).setData({ type: 'FeatureCollection', features: [] });
+  map.setFilter('selected-lake', ['==', ['get', 'id'], p.id]);
   history.replaceState(null, '', `#lake=${p.id}@${at[0].toFixed(3)},${at[1].toFixed(3)},${map.getZoom().toFixed(1)}`);
   body.replaceChildren();
   const t = TIERS[p.tier];
@@ -199,6 +201,7 @@ function fillRiver(r: River, rid: number, title: HTMLElement, meta: HTMLElement,
   if (frame) fitTo(lines.flat());
 }
 function setSelected(lines: [number, number][][]) {
+  map?.setFilter('selected-lake', ['==', ['get', 'id'], -1]);
   (map?.getSource('selected') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: lines.length ? [{ type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: lines } }] : [] });
 }
 function fitTo(pts: [number, number][]) {
@@ -231,6 +234,7 @@ function closePanel() {
   shown++;
   setFlow(null);
   (map?.getSource('selected') as GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: [] });
+  map?.setFilter('selected-lake', ['==', ['get', 'id'], -1]);
   history.replaceState(null, '', location.pathname);
 }
 panel.querySelector('.close')!.addEventListener('click', closePanel);
@@ -242,7 +246,7 @@ function goToLake(id: number, lon: number, lat: number, zoom: number) {
   map.flyTo({ center: [lon, lat], zoom, duration: 1600, essential: true, padding: phone ? { top: 0, left: 0, right: 0, bottom: innerHeight * 0.55 } : { top: 0, left: 0, bottom: 0, right: 400 } });
   map.once('idle', () => {
     const f = map.querySourceFeatures('atlas', { sourceLayer: 'lakes', filter: ['==', ['get', 'id'], id] });
-    if (f.length) showLake(f[0].properties as unknown as LakeProps, f.map((x) => ({ type: 'Feature', properties: {}, geometry: x.geometry })), [lon, lat]);
+    if (f.length) showLake(f[0].properties as unknown as LakeProps, [lon, lat]);
   });
 }
 function applyHash() {
@@ -286,7 +290,7 @@ input.addEventListener('input', async () => {
     const li = el('li'); li.setAttribute('role', 'option'); li.id = `hit-${i}`;
     if (r.kind === 'lake') {
       const sw = el('span', 'sw'); sw.style.background = TIERS[r.tier as 1 | 2 | 3].color;
-      li.append(sw, el('span', 'hn', r.name), el('span', 'ha', areaWords(r.area)));
+      li.append(sw, el('span', 'hn', r.name), el('span', 'ha', [r.country, areaWords(r.area)].filter(Boolean).join(', ')));
       li.addEventListener('mousedown', (e) => { e.preventDefault(); hits.hidden = true; input.blur(); goToLake(r.id, r.lon, r.lat, zoomFor(r.area)); });
     } else {
       li.append(el('span', 'sw riv'), el('span', 'hn', r.name), el('span', 'ha', `river, ${fmt(r.km)} km`));
@@ -294,7 +298,12 @@ input.addEventListener('input', async () => {
     }
     hits.append(li);
   }
-  hits.hidden = !res.length;
+  if (!res.length && input.value.trim().length >= 2) {
+    const li = el('li', 'none', 'No lake or river by that name. Try another spelling or the local name.');
+    li.setAttribute('aria-disabled', 'true');
+    hits.append(li);
+  }
+  hits.hidden = !hits.children.length;
   highlight(-1);
   input.setAttribute('aria-expanded', String(!hits.hidden));
 });

@@ -21,6 +21,7 @@ describe('evidence', () => {
     expect(e.map((x) => x.kind)).toEqual(['published', 'published']);
     expect(e[0].text).toContain('1,642 m at its deepest');
     expect(e[1].text).toContain('from the scientific literature');
+    expect(evidence({ ...baikal, wr: 0 })[0].text).toContain('without a cited source');
   });
   it('explains what the satellites saw and what is modelled', () => {
     expect(evidence(seen).map((x) => x.kind)).toEqual(['seen', 'model']);
@@ -33,9 +34,10 @@ describe('consistency of published numbers', () => {
   it('accepts a maximum depth a few times the mean, flags impossible or unusual ones', () => {
     expect(depthCheck(baikal)).toBeNull(); // 1,642 m max vs 738.7 m mean from volume: 2.2x
     // Titicaca as matched on 2026-11-25: Wikidata 489 m (no criterion) vs 112 m mean from a literature volume
-    expect(depthCheck({ id: 78, tier: 3, a: 8003, d: 112, v: 893000, vs: 1, wu: 489 })).toBeNull(); // 4.4x: high but possible
+    expect(depthCheck({ id: 78, tier: 3, a: 8003, d: 112, v: 893000, vs: 1, wu: 489 })).toContain('4.4 times'); // literature: ~281 m
+    expect(depthCheck({ id: 78, tier: 3, a: 8003, d: 112, v: 893000, vs: 1, wx: 281 })).toBeNull(); // 2.5x
     expect(depthCheck({ id: 1, tier: 3, a: 10, d: 20, vs: 1, wx: 12 })).toContain('less than the average depth');
-    expect(depthCheck({ id: 2, tier: 3, a: 10, d: 5, vs: 2, wu: 40 })).toContain('more than six times');
+    expect(depthCheck({ id: 2, tier: 3, a: 10, d: 5, vs: 2, wu: 40 })).toContain('8 times');
     expect(depthCheck(seen)).toBeNull(); // modelled volume: nothing to compare
   });
 });

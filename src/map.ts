@@ -20,9 +20,9 @@ export const FLOW_COLOR = '#fff1b8';
 
 /** The vector tiles live in their own static site (lakes-atlas-tiles), cut into 2 MiB pieces: they change rarely and
  *  are far bigger than the app. VITE_TILES overrides the location (the dev setup serves them from localhost:5401). */
-export const TILES: string = import.meta.env.VITE_TILES ?? 'https://lakes-atlas-tiles.pages.dev/';
+export const TILES: string = import.meta.env.VITE_TILES ?? 'https://inlandwater-tiles.bristleconelab.org/';
 /** Bump when the tile archive is rebuilt (pipeline/build_tiles.sh NAME). */
-const TILES_VERSION = 'v4';
+const TILES_VERSION = 'v5';
 
 export async function createMap(container: HTMLElement): Promise<maplibregl.Map> {
   // versioned: the tile site caches files for a week, and a new archive lives under a new folder (lakes-atlas-v4/)
@@ -67,6 +67,9 @@ export async function createMap(container: HTMLElement): Promise<maplibregl.Map>
       { id: 'flow-glow', type: 'line', source: 'flow', filter: ['==', ['geometry-type'], 'LineString'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': FLOW_COLOR, 'line-width': 7, 'line-opacity': 0.25, 'line-blur': 3 } },
       { id: 'flow', type: 'line', source: 'flow', filter: ['==', ['geometry-type'], 'LineString'], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': FLOW_COLOR, 'line-width': 2.4, 'line-dasharray': [2, 1.5] } },
       { id: 'flow-end', type: 'circle', source: 'flow', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 6, 'circle-color': FLOW_COLOR, 'circle-stroke-color': '#0c1a24', 'circle-stroke-width': 2 } },
+      // the chosen lake, drawn from the tiles themselves: a GeoJSON copy of the tile pieces showed the cuts between
+      // tiles as pink lines across the lake
+      { id: 'selected-lake', type: 'line', source: 'atlas', 'source-layer': 'lakes', filter: ['==', ['get', 'id'], -1], paint: { 'line-color': SELECT_COLOR, 'line-width': 3 } },
       { id: 'selected', type: 'line', source: 'selected', paint: { 'line-color': SELECT_COLOR, 'line-width': 3 } },
       {
         id: 'river-labels', type: 'symbol', source: 'atlas', 'source-layer': 'rivernames', minzoom: 2,
@@ -93,13 +96,10 @@ export async function createMap(container: HTMLElement): Promise<maplibregl.Map>
   return map;
 }
 
-/** The lake under a point, with its full outline (all tile pieces with the same id merged). */
-export function lakeAt(map: maplibregl.Map, point: maplibregl.PointLike): { props: LakeProps; outline: GeoJSON.Feature[] } | null {
+/** The lake under a point (its outline is drawn from the tiles by the 'selected-lake' layer). */
+export function lakeAt(map: maplibregl.Map, point: maplibregl.PointLike): LakeProps | null {
   const hit = map.queryRenderedFeatures(point, { layers: ['lakes'] })[0] as MapGeoJSONFeature | undefined;
-  if (!hit) return null;
-  const id = hit.properties.id as number;
-  const parts = map.querySourceFeatures('atlas', { sourceLayer: 'lakes', filter: ['==', ['get', 'id'], id] });
-  return { props: hit.properties as unknown as LakeProps, outline: parts.map((f) => ({ type: 'Feature', properties: {}, geometry: f.geometry })) };
+  return hit ? (hit.properties as unknown as LakeProps) : null;
 }
 
 /** The biggest river reach within a few pixels of a point (river lines are thin). */

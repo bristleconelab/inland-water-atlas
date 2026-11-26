@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodePath, flowSentence, seaName, sparkline, waterSummary } from '../src/v2';
+import { decodePath, flowSentence, seaName, sparkline, volumeLabel, waterSummary } from '../src/v2';
 
 describe('paths', () => {
   it('decodes delta-coded 0.01 degree steps', () => {
@@ -14,6 +14,8 @@ describe('flow sentences', () => {
     expect(flowSentence({ p: [], km: 1210, endo: 1, sinkName: 'Aral Sea' })).toContain('ends in Aral Sea');
     expect(flowSentence({ p: [], km: 0, endo: 1, sinkName: 'Balkhash' }, 'Balkhash')).toContain('bottom of a basin with no outlet');
     expect(seaName('Gulf of Mexico')).toBe('the Gulf of Mexico');
+    expect(seaName('Great Australian Bight')).toBe('the Great Australian Bight');
+    expect(seaName('Golfe du Lion')).toBe('Golfe du Lion');
     // Lake Chany: a closed basin whose outlet HydroRIVERS does not mark as inland and that is far from any sea
     expect(flowSentence({ p: [], km: 0, endo: 0, sea: null })).toContain('No mapped river leaves this lake');
   });
@@ -30,6 +32,7 @@ describe('water over time', () => {
   it('says "about as much" for small changes and refuses short records', () => {
     expect(waterSummary({ y0: 2000, v: [10, 10.2, 9.9, 10.1, 10, 10.3, 9.8, 10, 10.1, 10.2] })!.words).toMatch(/^About as much/);
     expect(waterSummary({ y0: 2000, v: [1, 2, 3] })).toBeNull();
+    expect(waterSummary({ y0: 2000, v: [0, 0, 0, 0, 0, 0, 0, 0] })).toBeNull();
   });
   it('uses words, not absurd percentages, when one end is nearly empty', () => {
     const reservoir = { y0: 1984, v: [0.01, 0.02, 0.01, 0.03, 0.02, 5, 40, 80, 90, 95, 92, 94, 96] };
@@ -42,6 +45,8 @@ describe('water over time', () => {
     // Narran-like: floods in some years, almost dry in others, no steady direction
     const episodic = { y0: 1987, v: [80, 10, 75, 6, 70, 5, 90, 8, 4, 60, 7, 3, 85, 6, 5, 70, 4, 6] };
     expect(waterSummary(episodic)!.words).toMatch(/^Its water comes and goes/);
+    // the same with dry years at exactly zero, as the deseasonalised GloLakes values give them
+    expect(waterSummary({ y0: 1987, v: [30, 32, 0, 0, 0, 0, 25, 28, 0, 0, 0, 0, 34, 0, 0, 0, 0, 20, 0, 0] })!.words).toMatch(/^Its water comes and goes/);
     // a steady decline with big swings is still a decline
     const aral = { y0: 1984, v: [100, 98, null, 102, 99, 101, 90, 80, 60, 40, 30, 22, 20, 19, 21, 20] };
     expect(waterSummary(aral)!.words).toMatch(/% less water/);
@@ -49,5 +54,11 @@ describe('water over time', () => {
   it('draws a path with gaps', () => {
     const svg = sparkline({ y0: 2000, v: [1, null, 3, 4] });
     expect(svg.match(/M/g)).toHaveLength(2);
+  });
+  it('starts the volume scale at zero and labels it', () => {
+    const svg = sparkline({ y0: 2000, v: [1500, 1480, 1490] });
+    expect(svg).toContain('>0<');
+    expect(svg).toContain('1.5 km³');
+    expect(volumeLabel(12.34)).toBe('12 million m³');
   });
 });

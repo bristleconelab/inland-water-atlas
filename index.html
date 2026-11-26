@@ -3,25 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Lake Atlas: how deep is this lake, and how do we know?</title>
-  <meta name="description" content="1.4 million lakes on one map, coloured by what we actually know about their depth: published, seen from space, or only a model's estimate. Click any lake or river.">
+  <title>Inland Water Atlas: the world's lakes and rivers, and how we know them</title>
+  <meta name="description" content="1.4 million lakes and 7,000 named rivers on one map: what is measured, what is seen from space, and what is only a model. Lake depth, water since 1984, where the water goes, and river levels from the SWOT satellite.">
   <meta name="theme-color" content="#0c1a24">
-  <link rel="canonical" href="https://lakes.bristleconelab.org/">
-  <meta property="og:title" content="Lake Atlas">
+  <link rel="canonical" href="https://inlandwater.bristleconelab.org/">
+  <meta property="og:title" content="Inland Water Atlas">
   <meta property="og:description" content="How deep is this lake, and how do we know? For two thirds of the world's lakes, only a model knows.">
-  <meta property="og:url" content="https://lakes.bristleconelab.org/">
-  <meta property="og:image" content="https://lakes.bristleconelab.org/og-image.png">
+  <meta property="og:url" content="https://inlandwater.bristleconelab.org/">
+  <meta property="og:image" content="https://inlandwater.bristleconelab.org/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230c1a24'/%3E%3Cpath d='M6 19c3-6 8-9 13-7s5 7 1 9-10 3-14-2z' fill='%23ffd166'/%3E%3C/svg%3E">
 </head>
 <body>
-  <div id="map" aria-label="Map of the world's lakes. Click a lake to see how deep it is and how we know."></div>
+  <div id="map" aria-label="Map of the world's lakes and rivers. Click one to see what is known about it and how."></div>
 
   <header class="masthead">
-    <h1>Lake Atlas</h1>
-    <p class="sub">How deep is this lake, and how do we know?</p>
+    <h1>Inland Water Atlas</h1>
+    <p class="sub">Lakes and rivers: what is measured, what is seen from space, and what is only a model.</p>
     <div class="search" role="search">
-      <label for="search" class="visually-hidden">Find a lake</label>
+      <label for="search" class="visually-hidden">Find a lake or river</label>
       <input id="search" type="search" autocomplete="off" spellcheck="false" placeholder="Find a lake or river: Baikal, Volga, Aral…" role="combobox" aria-expanded="false" aria-controls="hits">
       <ul id="hits" role="listbox" hidden></ul>
     </div>
@@ -49,9 +49,9 @@
   <dialog id="about" aria-labelledby="about-title">
     <button class="close" aria-label="Close">×</button>
     <h2 id="about-title">How this map was made</h2>
-    <p>Every lake of at least 10 hectares (1,427,688 of them) comes from HydroLAKES. For almost all of them, the depth and volume in that database, and in most maps and models that use it, are estimated from the lake's size and the slope of the land around it. This atlas sorts every lake by the best evidence there is for its depth:</p>
+    <p>This atlas shows the world's lakes and the rivers between them, and for each what is measured, what is seen from space and what is only a model. Every lake of at least 10 hectares (1,427,688 of them) comes from HydroLAKES. For almost all of them, the depth and volume in that database, and in most maps and models that use it, are estimated from the lake's size and the slope of the land around it. This atlas sorts every lake by the best evidence there is for its depth:</p>
     <ul>
-      <li><b>Depth published:</b> HydroLAKES took the volume from the scientific literature (266 lakes) or from the dam register GRanD (6,723 reservoirs), or a depth is recorded on Wikidata from published sources (7,616 lakes, matched when the Wikidata point lies inside the lake).</li>
+      <li><b>Depth published:</b> HydroLAKES took the volume from the scientific literature (266 lakes) or from the dam register GRanD (6,723 reservoirs), or a depth is recorded on Wikidata (7,616 lakes, matched when the Wikidata point lies inside the lake; deprecated values are left out, and the panel says when a depth cites no source).</li>
       <li><b>Seen from space:</b> 3D-LAKES traced how the shoreline moved as the water rose and fell, with ICESat-2 laser heights and Landsat images. That shows the shape of the top of the lake bed, typically a band 0.66 m high; the rest of the depth is still extrapolated.</li>
       <li><b>Model only:</b> neither of the above.</li>
     </ul>
@@ -63,14 +63,14 @@
       <li>Rivers with an average flow of at least 5 m³/s, and where each lake's water goes: <a href="https://www.hydrosheds.org/products/hydrorivers">HydroRIVERS v1.0</a>, Lehner and Grill (2013) (CC BY 4.0).</li>
       <li>Water volume since 1984: <a href="https://doi.org/10.25914/K8ZF-6G46">GloLakes v1.1</a>, Hou et al. (2024) Earth System Science Data (CC BY 4.0).</li>
       <li>Names of the seas where rivers end: <a href="https://www.naturalearthdata.com">Natural Earth</a> (public domain).</li>
-      <li>River names, widths and SWOT water-level statistics: <a href="https://doi.org/10.5281/zenodo.23870877">SWORD v17c</a>, the SWOT River Database (CC BY 4.0); names © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors.</li>
-      <li>River water level at a point: every pass of the SWOT satellite (NASA and CNES), from <a href="https://podaac.github.io/hydrocron/">PO.DAAC Hydrocron</a>, fetched when you click.</li>
+      <li>River names, widths and the stretches SWOT has measured: <a href="https://doi.org/10.5281/zenodo.23870877">SWORD v17c</a>, the SWOT River Database (CC BY 4.0); names © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors.</li>
+      <li>River water level at a point: every good pass of the SWOT satellite (NASA and CNES), heights above the EGM2008 geoid, from <a href="https://podaac.github.io/hydrocron/">PO.DAAC Hydrocron</a>, fetched when you click.</li>
       <li>River translations and Wikidata items: <a href="https://www.wikidata.org">Wikidata</a> (CC0).</li>
       <li>Background: NASA Blue Marble through <a href="https://earthdata.nasa.gov/gibs">GIBS</a> (public domain).</li>
     </ul>
     <h3>What to keep in mind</h3>
-    <p>A Wikidata depth can be wrong or can belong to a nearby water body; each lake links to its item so it can be checked and corrected there. Satellite and model depths are averages over the lake, not soundings. River paths follow the mapped river network, so a lake that rarely overflows is still drawn as draining into the nearest river. GloLakes leaves out the very largest lakes, and its volumes are best read as ups and downs rather than exact amounts. River names exist only for rivers about 30 m wide or more, and a few big rivers are still split or carry a tributary's name on a stretch; river flows are model averages, not gauge readings.</p>
-    <p>Code: <a href="https://github.com/bristleconelab/lakes-atlas">github.com/bristleconelab/lakes-atlas</a> (MIT). From <a href="https://bristleconelab.org">Bristlecone Lab</a>; see also <a href="https://oceanlife.bristleconelab.org">Ocean Life Atlas</a>, <a href="https://underworld.bristleconelab.org">Underworld</a> and <a href="https://seaflooratlas.org">Seafloor Atlas</a>.</p>
+    <p>A Wikidata depth can be wrong or can belong to a nearby water body; each lake links to its item so it can be checked and corrected there. Satellite and model depths are averages over the lake, not soundings. River paths follow the mapped river network, so a lake that rarely overflows is still drawn as draining into the nearest river. GloLakes leaves out the very largest lakes, and its volumes are best read as ups and downs rather than exact amounts. River names exist only for rivers about 30 m wide or more, and a few rivers are still split or carry a tributary's name on a stretch. River flows are model averages, not gauge readings, and they do not take out what dams and irrigation use. Everything here is shared as is, to be checked against its sources before it is relied on.</p>
+    <p>Code: <a href="https://github.com/bristleconelab/inland-water-atlas">github.com/bristleconelab/inland-water-atlas</a> (MIT). From <a href="https://bristleconelab.org">Bristlecone Lab</a>; see also <a href="https://oceanlife.bristleconelab.org">Ocean Life Atlas</a>, <a href="https://underworld.bristleconelab.org">Underworld</a> and <a href="https://seaflooratlas.org">Seafloor Atlas</a>.</p>
   </dialog>
 
   <script type="module" src="/src/main.ts"></script>

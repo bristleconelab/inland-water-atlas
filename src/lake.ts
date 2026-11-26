@@ -6,6 +6,7 @@ export interface LakeProps {
   a: number;            // area km2
   n?: string;           // name
   c?: string;           // country
+  wr?: number;          // 1: every Wikidata depth of the lake cites a source; 0: one does not
   t?: number;           // HydroLAKES Lake_type: 1 lake, 2 reservoir, 3 lake control (regulated)
   d?: number;           // HydroLAKES average depth, m
   v?: number;           // HydroLAKES total volume, million m3
@@ -48,7 +49,7 @@ export function evidence(p: LakeProps): Evidence[] {
   if (p.wx != null) wd.push(`${n1(p.wx)} m at its deepest`);
   if (p.wm != null) wd.push(`${n1(p.wm)} m on average`);
   if (p.wu != null && p.wx == null && p.wm == null) wd.push(`${n1(p.wu)} m (not said whether mean or maximum)`);
-  if (wd.length) out.push({ kind: 'published', title: 'Published depth', text: `${cap(wd.join(', '))}, as recorded on Wikidata from published sources.` });
+  if (wd.length) out.push({ kind: 'published', title: 'Published depth', text: `${cap(wd.join(', '))}, as recorded on Wikidata${p.wr === 0 ? ' without a cited source, so treat it with care' : ' from published sources'}.` });
   if (p.vs === 1 && p.v != null) out.push({ kind: 'published', title: 'Published volume', text: `${cap(volumeWords(p.v))}, from the scientific literature; that makes it ${n1(p.d ?? 0)} m deep on average.` });
   if (p.vs === 2 && p.v != null) out.push({ kind: 'published', title: 'Reservoir register', text: `${cap(volumeWords(p.v))}, as registered for its dam (GRanD); that makes it ${n1(p.d ?? 0)} m deep on average.` });
   if (p.s != null && p.s > 0) out.push({ kind: 'seen', title: 'Seen from space', text: `Satellites have watched its water level move over ${n1(p.s)} m (ICESat-2 and Landsat, 3D-LAKES). Below that, its shape is extrapolated.` });
@@ -56,14 +57,16 @@ export function evidence(p: LakeProps): Evidence[] {
   return out;
 }
 
-/** Does a published single depth fit the average depth from a published volume? (A maximum depth is normally 1.5 to
- *  4 times the mean; below 1 or above 6 times means one of the numbers is probably wrong or belongs elsewhere.) */
+/** Does a published single depth fit the average depth from a published volume? Most lakes have a maximum depth 1.5
+ *  to 4 times their mean (a volume development 3 x mean / max of 0.75 to 2, Hakanson 2004); below 1 means one of the
+ *  numbers is wrong, above 4 is unusual enough to check (Titicaca's 489 m on Wikidata against 112 m mean: 4.4x; the
+ *  literature gives about 281 m). */
 export function depthCheck(p: LakeProps): string | null {
   const one = p.wx ?? p.wu;
   if (one == null || p.d == null || p.d <= 0 || !(p.vs === 1 || p.vs === 2)) return null;
   const r = one / p.d;
   if (r < 1) return `The published depth (${n1(one)} m) is less than the average depth its published volume implies (${n1(p.d)} m), so one of them is probably wrong.`;
-  if (r > 6) return `The published depth (${n1(one)} m) is more than six times the average depth its published volume implies (${n1(p.d)} m). That is unusual: check the source on Wikidata.`;
+  if (r > 4) return `The published depth (${n1(one)} m) is ${n1(r)} times the average depth its published volume implies (${n1(p.d)} m). Most lakes are 1.5 to 4 times deeper at their deepest point than on average, so one of the numbers may be wrong: check the source on Wikidata.`;
   return null;
 }
 

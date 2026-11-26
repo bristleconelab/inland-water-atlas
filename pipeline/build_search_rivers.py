@@ -1,8 +1,8 @@
 """Search index of named rivers -> out/search_rivers.json, from the river records of build_rivers.py (out/v2/river).
 
   {"n": [names], "id": [river id], "x": [lon*100], "y": [lat*100], "q": [m3/s at its end], "km": [length]}
-Rivers of at least 20 km, biggest flow first. A river with a local name that differs (Amudaryo / Amu Darya, Volga /
-Волга) is listed under both, so either finds it.
+Rivers of at least 20 km, biggest flow first. A river is listed under its name, its local name and its former SWORD
+name when they differ (Amu Darya / Amudaryo, Volga / Волга, Yangtze / Chang Jiang), so each finds it once per name.
 
 usage (from the project data folder, after build_rivers.py): python3 pipeline/build_search_rivers.py
 """
@@ -21,7 +21,7 @@ for f in sorted(Path("out/v2/river").glob("*.json")):
             x += part[i]; y += part[i + 1]
             pts.append((x, y))
         mx, my = pts[len(pts) // 2]
-        for name in dict.fromkeys(n for n in (v["n"], v.get("l")) if n):
+        for name in dict.fromkeys(n for n in (v["n"], v.get("l"), v.get("aka")) if n):
             rows.append((name, int(rid), mx, my, v["q"], v["km"]))
 rows.sort(key=lambda r: -r[4])
 out = {k: [r[i] for r in rows] for i, k in enumerate(("n", "id", "x", "y", "q", "km"))}

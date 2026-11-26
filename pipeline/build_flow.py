@@ -5,13 +5,17 @@ Downstream ("where does its water go?")
   outlet (DIST_DN_KM), the outlet reach of its river system (MAIN_RIV) and whether that system ends inland (ENDORHEIC).
   A lake joins the network at the reach nearest to its HydroLAKES pour point. Its path is the chain of reach ends down to
   the outlet, simplified to about 2 km. Inland outlets are named after the HydroLAKES lake they end in; coastal outlets
-  after the nearest Natural Earth marine area (public domain).
+  after the nearest Natural Earth sea (public domain; pipeline/seas.py leaves out areas named after a river mouth).
   Done for lakes of at least 1 km2, every named lake, and every GloLakes lake.
 
 Water over time ("how has its water changed?")
   GloLakes v1.1 (Hou et al., ESSD 2024, CC BY 4.0): monthly storage in million m3, 1984 to present, for 22,367 lakes,
-  mostly computed from the lake extent seen in Landsat images. Kept as yearly medians of months with data (years with
-  at least 3 months).
+  mostly computed from the lake extent seen in Landsat images. Kept as one value a year, without the seasons: each
+  month minus that lake's mean for the calendar month, the median of those for the year, plus the lake's median.
+  A plain median of whatever months were cloud-free makes a summer-only year look fuller or emptier than it was (1 %
+  of the lake's level typically, 7 % or more for one lake in ten); requiring 6 months instead would keep only 5,354
+  of 20,906 lakes. Years need MIN_MONTHS months; negative storage values are dropped, and so is the last year when the
+  record ends before December (GloLakes v1.1 ends 2026-11: a part year is not a year).
 
 Outputs (out/v2/): flow/NN.json and water/NN.json, 128 shards by Hylak_id % 128, plus meta.json.
 usage (on the processing server, from the project data folder):
@@ -21,8 +25,6 @@ from __future__ import annotations
 
 import json
 import time
-import urllib.request
-import zipfile
 import multiprocessing as mp
 from pathlib import Path
 
@@ -32,9 +34,11 @@ import pandas as pd
 import shapely
 import xarray as xr
 
+from seas import marine_areas, sea_names
+
 RAW, OUT = Path("raw"), Path("out/v2")
 SHARDS = 128
-NE_MARINE = "https://naciscdn.org/naturalearth/10m/physical/ne_10m_geography_marine_polys.zip"
+MIN_MONTHS = 3
 
 # ---- shared state for worker processes (filled before the pool forks) ----
 NEXT: np.ndarray
@@ -73,7 +77,14 @@ def main() -> None:
     for f in sorted((RAW / "glolakes").glob("*.nc")):
         ds = xr.open_dataset(f)
         st = pd.DataFrame(ds.lake_storage.values, index=pd.DatetimeIndex(ds.time.values), columns=ds.ID.values.astype(int))
-        yearly = st.groupby(st.index.year).agg(lambda c: c.median() if c.notna().sum() >= 3 else np.nan)
+        st = st.where(st >= 0)  # a few GloLakes series dip below zero (Hylak 14355: -16.9 million m3)
+        if st.index.max().month < 12:  # the record stops inside its last year
+            st = st[st.index.year < st.index.max().year]
+        yr = st.index.year
+        months = st.notna().groupby(yr).sum()
+        clim = st.groupby(st.index.month).transform("mean")  # each lake's mean for each calendar month
+        yearly = ((st - clim).groupby(yr).median() + st.median()).where(months >= MIN_MONTHS)
+        yearly = yearly.clip(lower=0)  # a dry year's anomaly can undershoot zero (NaN stays NaN)
         for lid in yearly.columns:
             s = yearly[lid]
             if s.notna().sum() < 5 or lid in water:
@@ -112,17 +123,7 @@ def main() -> None:
     names = lakes.set_index("Hylak_id")["name"]
     sink = gpd.sjoin_nearest(op, lp, how="left", max_distance=0.05).sort_values("Lake_area", ascending=False).drop_duplicates("row")
     sink_id = dict(zip(sink["row"], sink["Hylak_id"]))
-    ne = RAW / "ne_10m_geography_marine_polys.zip"
-    if not ne.exists():
-        urllib.request.urlretrieve(NE_MARINE, ne)
-    with zipfile.ZipFile(ne) as z:
-        shp = next(n for n in z.namelist() if n.endswith(".shp"))
-    marine = gpd.read_file(f"zip://{ne}!{shp}", engine="pyogrio", columns=["name"])
-    sea = gpd.sjoin_nearest(op, marine, how="left", distance_col="deg").drop_duplicates("row")
-    # an outlet more than 2.5 degrees from any named sea is not a river mouth (big estuaries end well short of the Natural
-    # Earth gulf polygon: the Yenisey by 1.2 degrees): HydroRIVERS stops there without saying where the
-    # water goes (Lake Chany, a closed basin, came out as "0 km to the Gulf of Ob" before this check)
-    sea_name = {r: (n if isinstance(n, str) and n and d <= 2.5 else None) for r, n, d in zip(sea["row"], sea["name"], sea["deg"])}
+    sea_name = sea_names(op, marine_areas(RAW))  # pipeline/seas.py: real seas only, not river mouths
 
     # ---------------- paths ----------------
     jobs = list(zip(near.Hylak_id.astype(int), near.start.astype(int), near.Pour_long, near.Pour_lat))
