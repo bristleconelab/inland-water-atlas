@@ -4,13 +4,16 @@
    "to": [where it ends: the river it joins, else its sea or inland lake, "" when unknown]}
 "to" tells apart rivers of one name in the results (three "Yangtze River" stretches, 13 "Xi River").
 Rivers of at least 20 km, biggest flow first. A river is listed under its name, its local name and its former SWORD
-name when they differ (Amu Darya / Amudaryo, Volga / Волга, Yangtze / Chang Jiang), so each finds it once per name.
+name when they differ (Amu Darya / Amudaryo, Volga / Волга, Yangtze / Chang Jiang), so each finds it once per name,
+and under its Wikidata labels in other languages (out/river_aliases.json from build_extra.py), kept apart in "an"
+with "ai", the row of the river each names.
 
 usage (from the project data folder, after build_rivers.py): python3 pipeline/build_search_rivers.py
 """
 import json
 from pathlib import Path
 
+aliases = json.loads(Path("out/river_aliases.json").read_text()) if Path("out/river_aliases.json").exists() else {}
 rows = []
 for f in sorted(Path("out/v2/river").glob("*.json")):
     for rid, v in json.loads(f.read_text()).items():
@@ -28,5 +31,12 @@ for f in sorted(Path("out/v2/river").glob("*.json")):
             rows.append((name, int(rid), mx, my, v["q"], v["km"], to))
 rows.sort(key=lambda r: -r[4])
 out = {k: [r[i] for r in rows] for i, k in enumerate(("n", "id", "x", "y", "q", "km", "to"))}
+out["an"], out["ai"] = [], []
+first: dict[int, int] = {}
+for i, r in enumerate(rows):
+    first.setdefault(r[1], i)
+for rid, i in first.items():
+    for al in aliases.get(str(rid), ()):
+        out["an"].append(al); out["ai"].append(i)
 Path("out/search_rivers.json").write_text(json.dumps(out, separators=(",", ":"), ensure_ascii=False))
-print(f"{len(rows):,} names for {len({r[1] for r in rows}):,} rivers -> out/search_rivers.json")
+print(f"{len(rows):,} names for {len({r[1] for r in rows}):,} rivers, {len(out['an']):,} in other languages -> out/search_rivers.json")

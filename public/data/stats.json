@@ -34,5 +34,8 @@
   "hydrolakes": "Messager et al. 2016, HydroLAKES v1.0, CC BY 4.0",
   "3dlakes": "Huang et al. 2025, 3D-LAKES, Zenodo 10.5281/zenodo.13107867, CC BY 4.0",
   "wikidata": "Wikidata via QLever, CC0, fetched 2026-11-26"
- }
+ },
+ "volShareKnown": 0.9464907407267463,
+ "volShareKnownNoCaspian": 0.9104576116509171,
+ "endorheicLakes": 48818
 }

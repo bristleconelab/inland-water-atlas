@@ -58,6 +58,49 @@ against depth below the surface. 3D-LAKES L1 levels (at least 3) are drawn as po
 seen, at most 12 evenly spaced. Model error: GLOBathy's maximum depth over a Wikidata maximum depth (criterion
 "maximum"); lakes where the two are equal within 0.5 m are listed but left out (GLOBathy uses the published value).
 
+## How a lake holds its water (`build_extra.py`, `src/limno.ts`)
+
+From HydroLAKES for every lake: shoreline length and shoreline development D_L (`Shore_dev`, 1 for a circle),
+residence time τ (`Res_time`, days: volume over mean outflow, both modelled for most lakes), catchment area and mean
+outflow. Derived in the page: volume development D_V = 3 z̄ / z_max (Håkanson 2004; the depths come from a published
+mean and maximum, else the mean from a published volume with a published maximum, or with a published depth of no
+stated kind that is at least 1.2 times that mean, else GLOBathy), relative depth z_r = 50 z_max √π / √A in % of the
+lake's diameter (Hutchinson 1957), and the catchment-to-lake area ratio. Each value names the depths it was made from.
+
+## Map views (`src/modes.ts`, `scripts/build_trend.ts`, `build_extra.py`)
+
+- **Drying or filling since 1984:** the GloLakes trend of each lake computed with the panel's own functions
+  (`waterSummary`, `trend`): Theil-Sen slope as a share of the lake's median volume a decade; a fall or rise is "clear"
+  when the Hamed-Rao corrected Mann-Kendall p is below 0.05 and the 95 % interval excludes zero; lakes whose water
+  comes and goes get no trend. 17,502 of 20,807 lakes: 1,290 falling, 2,748 rising.
+- **No way to the sea:** a lake whose outlet lies in a HydroBASINS level 8 unit with `ENDO` above 0, or in a main basin
+  whose outlet unit touches the Caspian (HydroSHEDS maps the Caspian as ocean, so without this the Volga, Ural and Kura
+  basins would count as draining to the sea): 48,818 lakes.
+- **Natural lake or reservoir:** HydroLAKES `Lake_type` (1 lake, 2 reservoir, 3 lake with a dam).
+- **How wrong the depth model is:** as below.
+
+A step change in a lake's water (Pettitt 1979; p ≈ 2 exp(-6K²/(n³+n²)), p < 0.05) is reported with the first year
+after it and the medians on both sides; a steady trend also produces one, so the text does not name a cause.
+
+## River profiles, dams and irrigation (`build_extra.py`, `src/profile.ts`)
+
+RiverATLAS v1.0 (Linke et al. 2019) carries HydroRIVERS' reach ids. For each named river, the main stem runs from the
+farthest top of its named reaches, up its largest branch while that branch has no other name (as its length is
+counted), down to its end. Along it, at most 160 evenly spaced reaches: elevation (`ele_mt_cmn`, the lowest ground in
+the reach's catchment), natural flow (`dis_m3_pyr`) and degree of regulation (`dor_pc_pva` / 10: the share of a year's
+flow that the GRanD reservoirs upstream can hold, capped at 1000 %; Lehner et al. 2011). The irrigated share of the
+basin above the end is `ire_pc_use`. Lakes and reservoirs on the river: HydroLAKES outlets of lakes of 1 km² or more
+(and all reservoirs) within 0.01 degrees of a main-stem reach. Every profile's length is within 10 % of its river's.
+
+## Names in other languages (`build_extra.py`, `build_search*.py`)
+
+Wikidata labels and other names, in Uzbek, Russian, Kazakh, Kyrgyz, Tajik, Turkmen, Mongolian, Chinese, Japanese,
+Korean, Arabic, Persian, Turkish, Hindi, Spanish, Portuguese, French, German, Italian, Finnish, Swedish, Norwegian,
+Polish and English, for the lakes and rivers matched to an item: up to 8 per lake or river that fold to something new.
+A lake also answers to up to 4 names of the lake its item is part of (P361), or of a Wikidata lake that matched no
+polygon (its point now on dry bed, like the Aral Sea's) whose point lies within 0.5 degrees and whose English name
+shares a word with it. Search folds accents and every apostrophe (Issiqkoʻl = Issiqko'l).
+
 ## Catchments (`build_basins.py`)
 
 HydroBASINS v1c level 8: the unit holding a lake's pour point (or a river's outlet, nearest within 0.05 degrees) and

@@ -1,6 +1,6 @@
 """Lake table for the atlas: how deep is each lake, and how do we know?
 
-Inputs (raw/, see fetch.sh):
+Inputs (raw/, see pipeline/fetch.sh):
   HydroLAKES v1.0 polygons (Messager et al. 2016, CC BY 4.0): 1,427,688 lakes >= 10 ha. Depth_avg and Vol_total come
     from literature (Vol_src 1), from the GRanD reservoir database (Vol_src 2) or from a geostatistical model (3).
   3D-LAKES (Huang et al. 2025, Sci Data, Zenodo 13107867, CC BY 4.0): area-elevation pairs that ICESat-2 and Landsat

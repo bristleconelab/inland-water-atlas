@@ -34,3 +34,21 @@ describe('names that repeat', () => {
     expect(prefixSearch(lk, 'sup')[0].country).toBe('United States');
   });
 });
+
+describe('names in other languages', () => {
+  const ix = { n: ['Aral Sea', 'Charvak Reservoir'], id: [1, 2], x: [0, 0], y: [0, 0], a: [3000, 40], t: [3, 3], an: ['Orol dengizi', 'Аральское море', 'Arals', 'Chorvoq suv ombori'], ai: [0, 0, 0, 1] };
+  it('finds a lake by its Uzbek or Russian name and says what the map calls it', () => {
+    expect(prefixSearch(ix, 'orol')[0]).toMatchObject({ id: 1, name: 'Orol dengizi', main: 'Aral Sea' });
+    expect(prefixSearch(ix, 'аральское')[0]).toMatchObject({ id: 1, main: 'Aral Sea' });
+    expect(prefixSearch(ix, 'chorvoq')[0]).toMatchObject({ id: 2, main: 'Charvak Reservoir' });
+  });
+  it('lists a lake once even when several of its names match', () => {
+    const hits = prefixSearch(ix, 'ar');
+    expect(hits.filter((h) => h.id === 1)).toHaveLength(1);
+    expect(hits[0]).toMatchObject({ name: 'Aral Sea', main: undefined }); // its own name wins over another language's
+  });
+  it('treats every apostrophe alike', () => {
+    expect(fold('Issiqkoʻl')).toBe(fold("Issiqko'l"));
+    expect(fold('Озёрное')).toBe('озерное');
+  });
+});

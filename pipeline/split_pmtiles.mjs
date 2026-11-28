@@ -1,6 +1,6 @@
 // Cut PMTiles archives into fixed-size pieces for a static host without range requests (Cloudflare Pages: 25 MiB per
 // file, 20,000 files per site). Writes <out>/<name>/00000.bin ... and <out>/manifest.json, read by src/chunked.ts.
-//   node scripts/split_pmtiles.mjs <out-dir> <chunk-bytes> dem=<file>[@<source-url>] coverage=<file>[@<source-url>]
+//   node pipeline/split_pmtiles.mjs <out-dir> <chunk-bytes> lakes-atlas=<file>[@<source-url>]
 // Every piece is re-read and the joined bytes are compared with the archive's SHA-256 before the manifest is written.
 import { createHash } from 'node:crypto';
 import { createReadStream, mkdirSync, openSync, readSync, closeSync, statSync, writeFileSync, readFileSync } from 'node:fs';

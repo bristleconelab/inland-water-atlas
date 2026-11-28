@@ -1,13 +1,15 @@
 // Name search over named lakes (pipeline/build_search.py) and named rivers (pipeline/build_rivers.py). Pure
 // (test/search.test.ts).
-export interface SearchIndex { n: string[]; id: number[]; x: number[]; y: number[]; a: number[]; t: number[]; c?: string[] }
-export interface RiverIndex { n: string[]; id: number[]; x: number[]; y: number[]; q: number[]; km: number[]; to?: string[] }
-export interface Hit { name: string; id: number; lon: number; lat: number; area: number; tier: number; starts: boolean; country?: string }
-export interface RiverHit { name: string; id: number; lon: number; lat: number; km: number; q: number; starts: boolean; to?: string }
+/** an/ai: names in other languages (Wikidata labels, pipeline/build_search.py) and the row each one names. */
+export interface SearchIndex { n: string[]; id: number[]; x: number[]; y: number[]; a: number[]; t: number[]; c?: string[]; an?: string[]; ai?: number[] }
+export interface RiverIndex { n: string[]; id: number[]; x: number[]; y: number[]; q: number[]; km: number[]; to?: string[]; an?: string[]; ai?: number[] }
+export interface Hit { name: string; id: number; lon: number; lat: number; area: number; tier: number; starts: boolean; country?: string; main?: string }
+export interface RiverHit { name: string; id: number; lon: number; lat: number; km: number; q: number; starts: boolean; to?: string; main?: string }
 
-/** Lower case without accents, so "leman" finds "Léman". */
+/** Lower case without accents, so "leman" finds "Léman"; every apostrophe as ' (Uzbek writes Issiqkoʻl, Issiqko'l
+ *  and Issiqko’l), ё as е. */
 export function fold(s: string): string {
-  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[ʻʼ’‘`´]/g, "'").replace(/ё/g, 'е');
 }
 
 const foldedNames = new WeakMap<string[], string[]>();
@@ -34,12 +36,25 @@ function match(names: string[], query: string, limit: number, ids?: number[]): [
   return [...starts.map((i) => [i, true] as [number, boolean]), ...words.map((i) => [i, false] as [number, boolean])].slice(0, limit);
 }
 
+/** Rows matching by their own name or by a name in another language: [row, starts, the other name], names that
+ *  start with the query first, then by row (biggest first), each lake or river once. */
+function matchRows(ix: { n: string[]; id: number[]; an?: string[]; ai?: number[] }, query: string, limit: number): [number, boolean, string?][] {
+  const own: [number, boolean, string?][] = match(ix.n, query, limit, ix.id);
+  const other: [number, boolean, string?][] = ix.an && ix.ai ? match(ix.an, query, limit).map(([j, st]) => [ix.ai![j], st, ix.an![j]]) : [];
+  const seen = new Set<number>(), out: [number, boolean, string?][] = [];
+  for (const h of [...own, ...other].sort((a, b) => Number(b[1]) - Number(a[1]) || a[0] - b[0] || Number(!!a[2]) - Number(!!b[2]))) {
+    if (seen.has(ix.id[h[0]])) continue;
+    seen.add(ix.id[h[0]]); out.push(h);
+  }
+  return out.slice(0, limit);
+}
+
 export function prefixSearch(ix: SearchIndex, query: string, limit = 8): Hit[] {
-  return match(ix.n, query, limit).map(([i, starts]) => ({ name: ix.n[i], id: ix.id[i], lon: ix.x[i] / 100, lat: ix.y[i] / 100, area: ix.a[i], tier: ix.t[i], starts, country: ix.c?.[i] || undefined }));
+  return matchRows(ix, query, limit).map(([i, starts, other]) => ({ name: other ?? ix.n[i], id: ix.id[i], lon: ix.x[i] / 100, lat: ix.y[i] / 100, area: ix.a[i], tier: ix.t[i], starts, country: ix.c?.[i] || undefined, main: other ? ix.n[i] : undefined }));
 }
 
 export function riverSearch(ix: RiverIndex, query: string, limit = 8): RiverHit[] {
-  return match(ix.n, query, limit, ix.id).map(([i, starts]) => ({ name: ix.n[i], id: ix.id[i], lon: ix.x[i] / 100, lat: ix.y[i] / 100, km: ix.km[i], q: ix.q[i], starts, to: ix.to?.[i] || undefined }));
+  return matchRows(ix, query, limit).map(([i, starts, other]) => ({ name: other ?? ix.n[i], id: ix.id[i], lon: ix.x[i] / 100, lat: ix.y[i] / 100, km: ix.km[i], q: ix.q[i], starts, to: ix.to?.[i] || undefined, main: other ? ix.n[i] : undefined }));
 }
 
 export type AnyHit = ({ kind: 'lake' } & Hit) | ({ kind: 'river' } & RiverHit);

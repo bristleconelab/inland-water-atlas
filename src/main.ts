@@ -6,12 +6,15 @@ import { areaWords, depthCheck, evidence, KIND, TIERS, verdict, type LakeProps }
 import { createMap, LAKE_COLOR, LAKE_OPACITY, lakeAt, riverAt, TILES } from './map';
 import { decodePath, flowSentence, lakeFlow, lakeWater, seaName, sparkline, waterSummary } from './v2';
 import { levelChart, levelSummary, riverEnd, riverFacts, riverLines, riverRecord, swotLevels, theRiver, type Reach, type River } from './river';
-import { trend, trendWords } from './trend';
+import { pettitt, stepWords, trend, trendWords } from './trend';
+import { EXTRA_VERSION, indices, lakeLimno, limnoWords } from './limno';
+import { damWords, profileChart, riverProfile } from './profile';
 import { errorColor, lakeShape, modelCurve, modelError, observed, shapeChart, shapeWords } from './shape';
 import { download, scientist, tableHTML, toCSV, type Row } from './sci';
 import { basinOf, basinRings, basinWords, type Basin } from './basin';
 import { addItem, COLORS, compareChart, type Item } from './compare';
 import { lakeLevel, levelWords, levelYearsChart } from './levels';
+import { DIM, KIND_COLOR, LEGEND, modeNote, trendColor, type Mode } from './modes';
 import { mergeHits, prefixSearch, riverSearch, type RiverIndex, type SearchIndex } from './search';
 
 const $ = <T extends HTMLElement>(s: string) => document.querySelector(s) as T;
@@ -40,31 +43,83 @@ async function start() {
 }
 
 // ---------- headline and key ----------
-fetch(`${base}data/stats.json`).then((r) => r.json()).then((s: { lakes: number; published: number; seen: number; modelled: number }) => {
+fetch(`${base}data/stats.json`).then((r) => r.json()).then((s: { lakes: number; published: number; seen: number; modelled: number; areaShareKnown?: number; volShareKnown?: number }) => {
   const pct = (x: number) => `${(100 * x / s.lakes).toFixed(x / s.lakes < 0.1 ? 1 : 0)} %`;
-  $('#headline').textContent = `Of ${fmt(s.lakes)} lakes, the depth of only ${fmt(s.published)} (${pct(s.published)}) has been published. For ${pct(s.modelled)} of them, the depth on any map is a model's guess.`;
+  const big = s.areaShareKnown && s.volShareKnown ? ` They are mostly the big ones: they hold ${Math.round(s.areaShareKnown * 100)} % of all lake area and ${Math.round(s.volShareKnown * 100)} % of the water.` : '';
+  $('#headline').textContent = `Of ${fmt(s.lakes)} lakes, the depth of only ${fmt(s.published)} (${pct(s.published)}) has been published.${big} For ${pct(s.modelled)} of the lakes, the depth on any map is a model's guess.`;
   $('#c3').textContent = fmt(s.published); $('#c2').textContent = fmt(s.seen); $('#c1').textContent = fmt(s.modelled);
 });
 const tiersOn = new Set([1, 2, 3]);
 document.querySelectorAll<HTMLInputElement>('input[data-tier]').forEach((cb) => cb.addEventListener('change', () => {
   const t = Number(cb.dataset.tier);
   if (cb.checked) tiersOn.add(t); else tiersOn.delete(t);
+  if (mode !== 'evidence') return;
   const f = ['in', ['get', 'tier'], ['literal', [...tiersOn]]] as unknown as FilterSpecification;
   map?.setFilter('lakes', f); map?.setFilter('lakes-edge', f);
 }));
-// ---------- model error view: GLOBathy's maximum depth against published maxima (src/shape.ts) ----------
-let errorView = false;
-$<HTMLInputElement>('#error-on').addEventListener('change', async (e) => {
-  errorView = (e.target as HTMLInputElement).checked;
-  const me = await modelError(TILES);
-  if (!me || !map) return;
-  for (const [id, [pub, mod, same]] of Object.entries(me.lakes)) // a reused published depth is no test: left grey
-    if (!same) map.setFeatureState({ source: 'atlas', sourceLayer: 'lakes', id: Number(id) }, { err: errorView, c: errorColor(mod, pub) });
-  map.setPaintProperty('lakes', 'fill-color', errorView ? ['case', ['boolean', ['feature-state', 'err'], false], ['feature-state', 'c'], '#3a4650'] : LAKE_COLOR);
-  map.setPaintProperty('lakes', 'fill-opacity', errorView ? ['case', ['boolean', ['feature-state', 'err'], false], 1, 0.35] : LAKE_OPACITY);
-  $('#error-note').hidden = !errorView;
-  $('#error-note').textContent = `${fmt(me.stats.n)} lakes have a published maximum depth that GLOBathy did not use itself (${me.stats.sameAsPublished} more it did). Its model is within a factor of two for ${Math.round(me.stats.withinFactor2 * 100)} % of them and within a quarter for ${Math.round(me.stats.withinFactor1_25 * 100)} %. Blue: the model is too shallow; red: too deep.`;
-});
+// ---------- map views: what the lake colours show (src/modes.ts) ----------
+let mode: Mode = 'evidence';
+let trends: Promise<Record<string, [number, number, number]>> | null = null;
+let endoIds: Promise<number[]> | null = null;
+const getJSON = <T,>(path: string, empty: T) => fetch(`${TILES}${path}?v=${EXTRA_VERSION}`).then((r) => (r.ok ? r.json() : empty)).catch(() => empty) as Promise<T>;
+const tierBoxes = document.querySelectorAll<HTMLInputElement>('input[data-tier]');
+$<HTMLSelectElement>('#mode').addEventListener('change', (e) => setMode((e.target as HTMLSelectElement).value as Mode));
+async function setMode(m: Mode) {
+  mode = m;
+  if (!map) return;
+  map.removeFeatureState({ source: 'atlas', sourceLayer: 'lakes' });
+  const note = $('#error-note'), legend = $('#mode-legend');
+  // the evidence filter applies to the evidence view only
+  tierBoxes.forEach((cb) => { cb.disabled = m !== 'evidence'; });
+  const all = ['in', ['get', 'tier'], ['literal', m === 'evidence' ? [...tiersOn] : [1, 2, 3]]] as unknown as FilterSpecification;
+  map.setFilter('lakes', all); map.setFilter('lakes-edge', all);
+  const byState = (dimOpacity: number) => {
+    map.setPaintProperty('lakes', 'fill-color', ['case', ['boolean', ['feature-state', 'on'], false], ['feature-state', 'c'], DIM]);
+    map.setPaintProperty('lakes', 'fill-opacity', ['case', ['boolean', ['feature-state', 'on'], false], 1, dimOpacity]);
+  };
+  let words = '';
+  if (m === 'evidence') {
+    map.setPaintProperty('lakes', 'fill-color', LAKE_COLOR);
+    map.setPaintProperty('lakes', 'fill-opacity', LAKE_OPACITY);
+  } else if (m === 'kind') {
+    map.setPaintProperty('lakes', 'fill-color', KIND_COLOR as never);
+    map.setPaintProperty('lakes', 'fill-opacity', 0.9);
+    words = modeNote('kind', {});
+  } else if (m === 'error') {
+    const me = await modelError(TILES);
+    if (!me || mode !== m) return;
+    for (const [id, [pub, mod, same]] of Object.entries(me.lakes)) // a reused published depth is no test: left grey
+      if (!same) map.setFeatureState({ source: 'atlas', sourceLayer: 'lakes', id: Number(id) }, { on: true, c: errorColor(mod, pub) });
+    byState(0.35);
+    words = `${fmt(me.stats.n)} lakes have a published maximum depth that GLOBathy did not use itself (${me.stats.sameAsPublished} more it did). Its model is within a factor of two for ${Math.round(me.stats.withinFactor2 * 100)} % of them and within a quarter for ${Math.round(me.stats.withinFactor1_25 * 100)} %.`;
+  } else if (m === 'trend') {
+    trends ??= getJSON('v2/trend.json', {});
+    const t = await trends;
+    if (mode !== m) return;
+    const c = { falling: 0, rising: 0, flat: 0 };
+    for (const [id, v] of Object.entries(t)) {
+      map.setFeatureState({ source: 'atlas', sourceLayer: 'lakes', id: Number(id) }, { on: true, c: trendColor(v) });
+      if (v[2] === 1) c.falling++; else if (v[2] === 2) c.rising++; else c.flat++;
+    }
+    byState(0.3);
+    words = modeNote('trend', c);
+  } else if (m === 'endo') {
+    endoIds ??= getJSON('v2/endo.json', []);
+    const ids = await endoIds;
+    if (mode !== m) return;
+    for (const id of ids) map.setFeatureState({ source: 'atlas', sourceLayer: 'lakes', id }, { on: true, c: '#e9c46a' });
+    byState(0.3);
+    words = modeNote('endo', { endo: ids.length });
+  }
+  legend.replaceChildren();
+  if (m !== 'evidence') for (const [col, label] of LEGEND[m]) {
+    const li = el('li'); const sw = el('span', 'sw'); sw.style.background = col;
+    li.append(sw, el('span', '', label)); legend.append(li);
+  }
+  legend.hidden = m === 'evidence';
+  note.textContent = words;
+  note.hidden = !words;
+}
 $<HTMLInputElement>('#sci-on').checked = scientist.on;
 $<HTMLInputElement>('#sci-on').addEventListener('change', (e) => {
   scientist.on = (e.target as HTMLInputElement).checked;
@@ -123,21 +178,30 @@ function showLake(p: LakeProps, at: [number, number]) {
     }
   });
   basinOf(TILES, 'L', p.id).then((b) => { if (token === shown && b) fillBasin(basinBox, b, 'lake'); });
-  lakeLevel(TILES, p.id).then((l) => {
+  Promise.all([lakeLevel(TILES, p.id), lakeWater(TILES, p.id)]).then(([l, w]) => {
     if (token !== shown || !l) return;
-    const tr = trend(l.y0, l.v);
-    levelBox.append(el('h3', '', 'Its water level since ' + l.y0), el('p', '', levelWords(l, tr)));
+    // a lake that dries out: in dry years the radar measures the bed, not water, so its "level" is no water level
+    const dries = !!w && dryYears(w.v) > 0;
+    const tr = dries ? null : trend(l.y0, l.v);
+    levelBox.append(el('h3', '', 'Its water level since ' + l.y0), el('p', '', dries ? 'Radar altimetry has followed this lake since ' + l.y0 + ', but Landsat shows it dry or nearly dry in some years. Then the radar measures the dry bed, not water, so these heights are not a water level and no trend is given.' : levelWords(l, tr)));
     const chart = el('div', 'spark'); chart.innerHTML = levelYearsChart(l, 300, 84, tr ?? undefined); // numbers only
     const axis = el('div', 'spark-axis'); axis.append(el('span', '', String(l.y0)), el('span', '', String(l.y0 + l.v.length - 1)));
     levelBox.append(chart, axis, el('p', 'fine', `Radar altimetry (TOPEX/Poseidon, Jason-1, 2 and 3, Sentinel-6), yearly median of ${l.passes.toLocaleString('en-US')} passes over the “${l.n}” stretch, against its reference level; typical error ${Math.round(l.err * 100)} cm a pass. NASA GSFC Global Water Monitor (G-REALM).`));
   });
-  Promise.all([lakeShape(TILES, p.id), modelError(TILES)]).then(([s, me]) => {
-    if (token !== shown || !s) return;
-    const reused = !!me?.lakes[String(p.id)]?.[2];
-    shapeBox.append(el('h3', '', 'The shape of its bed'));
-    const chart = el('div', 'spark shape'); chart.innerHTML = shapeChart(s); // numbers only (src/shape.ts)
-    shapeBox.append(chart);
-    for (const line of shapeWords(s, p.wx, reused)) shapeBox.append(el('p', 'fine', line));
+  Promise.all([lakeShape(TILES, p.id), modelError(TILES), lakeLimno(TILES, p.id)]).then(([s, me, lm]) => {
+    if (token !== shown) return;
+    if (s) {
+      const reused = !!me?.lakes[String(p.id)]?.[2];
+      shapeBox.append(el('h3', '', 'The shape of its bed'));
+      const chart = el('div', 'spark shape'); chart.innerHTML = shapeChart(s); // numbers only (src/shape.ts)
+      shapeBox.append(chart);
+      for (const line of shapeWords(s, p.wx, reused)) shapeBox.append(el('p', 'fine', line));
+    }
+    const lines = limnoWords(indices(p, lm, s));
+    if (lines.length) {
+      shapeBox.append(el('h3', '', 'How it holds its water'));
+      for (const line of lines) shapeBox.append(el('p', 'fine', line));
+    }
   });
   lakeWater(TILES, p.id).then((w) => {
     if (token !== shown || !w) return;
@@ -147,6 +211,8 @@ function showLake(p: LakeProps, at: [number, number]) {
     // the trend is not told for a lake whose water comes and goes: its start and end are as arbitrary as any other year
     const tr = sum && !sum.words.startsWith('Its water comes and goes') ? trend(w.y0, w.v) : null;
     if (tr) waterBox.append(el('p', 'trend', trendWords(tr, w.y0, w.y0 + w.v.length - 1)));
+    const step = tr ? pettitt(w.y0, w.v) : null;
+    if (step) waterBox.append(el('p', 'trend', stepWords(step)));
     const chart = el('div', 'spark');
     chart.innerHTML = sparkline(w, 300, 84, tr ?? undefined); // built from numbers only (src/v2.ts)
     const axis = el('div', 'spark-axis');
@@ -158,6 +224,12 @@ function showLake(p: LakeProps, at: [number, number]) {
   });
 }
 let shown = 0;
+/** Years in which a lake held almost no water (under 5 % of its fullest year). */
+function dryYears(v: (number | null)[]): number {
+  const vals = v.filter((x): x is number => x != null);
+  const peak = Math.max(0, ...vals);
+  return peak > 0 ? vals.filter((x) => x < 0.05 * peak).length : 0;
+}
 
 // ---------- compare up to four lakes (src/compare.ts) ----------
 let compared: Item[] = [];
@@ -193,9 +265,11 @@ function fillBasin(box: HTMLElement, b: Basin, kind: 'lake' | 'river') {
 /** The numbers view of a lake: every value with its source, and downloads (src/sci.ts). */
 async function lakeNumbers(p: LakeProps, box: HTMLElement) {
   const token = shown;
-  const [f, w, s, me] = await Promise.all([lakeFlow(TILES, p.id), lakeWater(TILES, p.id), lakeShape(TILES, p.id), modelError(TILES)]);
+  const [f, w, s, me, lm] = await Promise.all([lakeFlow(TILES, p.id), lakeWater(TILES, p.id), lakeShape(TILES, p.id), modelError(TILES), lakeLimno(TILES, p.id)]);
   if (token !== shown) return;
   const tr = w ? trend(w.y0, w.v) : null;
+  const step = w ? pettitt(w.y0, w.v) : null;
+  const ix = indices(p, lm, s);
   const vsName = { 1: 'literature', 2: 'GRanD dam register', 3: 'HydroLAKES model' } as Record<number, string>;
   const rows: Row[] = [
     ['HydroLAKES id', p.id, 'HydroLAKES v1.0'], ['Name', p.n], ['Country', p.c], ['Area (km²)', p.a, 'HydroLAKES'],
@@ -211,6 +285,11 @@ async function lakeNumbers(p: LakeProps, box: HTMLElement) {
     ['Trend (% of usual volume a decade)', tr && tr.level > 0 ? (tr.slope * 1000) / tr.level : null, 'Theil-Sen'],
     ['Trend 95 % interval (% a decade)', tr && tr.level > 0 ? `${((tr.lo * 1000) / tr.level).toFixed(2)} to ${((tr.hi * 1000) / tr.level).toFixed(2)}` : null, 'Sen 1968'],
     ['Mann-Kendall p (Hamed-Rao)', tr?.p, `n = ${tr?.n ?? ''}, tau = ${tr ? tr.tau.toFixed(3) : ''}`],
+    ['Step change, first year after (Pettitt)', step?.year, step ? `p = ${step.p.toFixed(3)}; median ${step.before.toFixed(1)} before, ${step.after.toFixed(1)} after (million m³)` : 'none at p < 0.05'],
+    ['Shoreline length (km)', lm?.[0], 'HydroLAKES Shore_len'], ['Shoreline development D_L', lm?.[1], 'HydroLAKES Shore_dev (1 = a circle)'],
+    ['Volume development D_V = 3 z̄ / z_max', ix.dv, ix.dvSrc], ['Relative depth z_r (%)', ix.zr, `50 z_max √π / √A, from the ${ix.zrSrc ?? ''}`],
+    ['Residence time (days)', lm?.[2], 'HydroLAKES Res_time (volume / mean outflow)'], ['Mean outflow (m³/s)', lm?.[4], 'HydroLAKES Dis_avg (WaterGAP)'],
+    ['Catchment area (km²)', lm?.[3], 'HydroLAKES Wshd_area'], ['Catchment / lake area', ix.ratio, 'HydroLAKES'],
   ];
   box.append(el('h3', '', 'The numbers'));
   const tbl = el('div', 'sci-wrap'); tbl.innerHTML = tableHTML(rows); // escaped (src/sci.ts)
@@ -286,7 +365,7 @@ function openRiver(rid: number | null, reach: Reach | null, frame: boolean) {
       levelBox.append(chart, axis, el('p', 'fine', 'Each dot is one pass of the SWOT satellite (NASA and CNES) over this stretch of river, from PO.DAAC Hydrocron. Doubtful passes are left out.'));
       if (scientist.on) {
         const b = el('button', 'btn-small', 'SWOT passes (CSV)');
-        b.addEventListener('click', () => download(`swot-${reach.s}.csv`, toCSV(['time_utc', 'wse_m_egm2008', 'wse_u_m'], pts.map((q) => [new Date(q.t).toISOString(), q.h, q.u ?? '']))));
+        b.addEventListener('click', () => download(`swot-${reach.s}.csv`, toCSV(['time_utc', 'wse_m_egm2008', 'wse_u_m', 'width_m', 'slope_m_per_m'], pts.map((q) => [new Date(q.t).toISOString(), q.h, q.u ?? '', q.w != null ? +q.w.toFixed(1) : '', q.s ?? '']))));
         const row = el('p', 'btns'); row.append(b); levelBox.append(row);
       }
     });
@@ -321,9 +400,23 @@ function fillRiver(r: River, rid: number, title: HTMLElement, meta: HTMLElement,
     wayBox.append(b);
   }
   wayBox.append(el('p', 'fine', 'Name from OpenStreetMap through SWORD; length, flow and course from HydroRIVERS.'));
-  const basinBox = el('div', '');
-  wayBox.append(basinBox);
+  const profBox = el('div', ''), basinBox = el('div', '');
+  wayBox.append(profBox, basinBox);
   const tok = shown;
+  riverProfile(TILES, rid).then((pf) => {
+    if (tok !== shown || !pf) return;
+    const svg = profileChart(pf);
+    profBox.append(el('h3', '', 'From its source to its end'));
+    if (svg) { const c = el('div', 'spark profile'); c.innerHTML = svg; profBox.append(c); } // numbers and escaped names only
+    const dw = damWords(pf);
+    if (dw) profBox.append(el('p', '', dw));
+    profBox.append(el('p', 'fine', `Height: lowest ground of each stretch's catchment; ${pf.lk?.length ? 'circles are lakes and squares reservoirs on the river; ' : ''}degree of regulation from the GRanD dams and natural flow (RiverATLAS, Linke et al. 2019).`));
+    if (scientist.on) {
+      const b = el('button', 'btn-small', 'Profile (CSV)');
+      b.addEventListener('click', () => download(`river-${rid}-profile.csv`, toCSV(['km_from_source', 'elevation_m', 'natural_flow_m3s', 'degree_of_regulation_pct'], pf.x.map((x, i) => [x, pf.z[i] ?? '', pf.q[i], pf.d[i]]))));
+      const r2 = el('p', 'btns'); r2.append(b); profBox.append(r2);
+    }
+  });
   basinOf(TILES, 'R', rid).then((b) => { if (tok === shown && b) fillBasin(basinBox, b, 'river'); });
   if (scientist.on) {
     const rows: Row[] = [
@@ -335,6 +428,12 @@ function fillRiver(r: River, rid: number, title: HTMLElement, meta: HTMLElement,
       ['Stretches measured by SWOT (5+ passes)', r.swot?.[0], 'SWORD v17c'], ['Width seen by SWOT (m)', r.swot?.[1], 'SWORD v17c'],
       ['Wikidata item', r.wd, 'Wikidata'], ['Clicked reach', reach?.id, 'HydroRIVERS'], ['SWORD reach at the click', reach?.s, 'SWORD v17c'],
     ];
+    riverProfile(TILES, rid).then((pf) => {
+      if (tok !== shown || !pf) return;
+      rows.push(['Degree of regulation at its end (%)', pf.d[pf.d.length - 1], 'RiverATLAS dor_pc_pva (GRanD v1.1)'], ['Highest degree of regulation along it (%)', Math.max(...pf.d), 'RiverATLAS'],
+        ['Irrigated share of its basin (%)', pf.ir, 'RiverATLAS ire_pc_use'], ['Lakes and reservoirs on the main stem', pf.lk?.length ?? 0, 'HydroLAKES outlets within 0.01°']);
+      box.innerHTML = tableHTML(rows); // escaped (src/sci.ts)
+    });
     const box = el('div', 'sci-wrap'); box.innerHTML = tableHTML(rows); // escaped (src/sci.ts)
     const b = el('button', 'btn-small', 'Numbers (CSV)');
     b.addEventListener('click', () => download(`river-${rid}.csv`, toCSV(['quantity', 'value', 'source'], rows.filter((x) => x[1] != null).map((x) => [x[0], x[1] as string | number, x[2] ?? '']))));
@@ -391,13 +490,17 @@ panel.querySelector('.close')!.addEventListener('click', closePanel);
 $('#compare .close').addEventListener('click', () => { compared = []; drawCompare(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !panel.hidden && !document.querySelector('dialog[open]')) closePanel(); });
 
-/** Fly to a lake and open it once its tiles are on screen. */
-function goToLake(id: number, lon: number, lat: number, zoom: number) {
+/** Fly to a lake and open it once its tiles are on screen. A small lake may be left out of the tiles at that zoom:
+ *  then zoom in and look again, twice, before saying so. */
+function goToLake(id: number, lon: number, lat: number, zoom: number, tries = 0) {
   const phone = matchMedia('(max-width: 760px)').matches; // the panel covers the bottom 60 % on phones
   map.flyTo({ center: [lon, lat], zoom, duration: 1600, essential: true, padding: phone ? { top: 0, left: 0, right: 0, bottom: innerHeight * 0.55 } : { top: 0, left: 0, bottom: 0, right: 400 } });
   map.once('idle', () => {
     const f = map.querySourceFeatures('atlas', { sourceLayer: 'lakes', filter: ['==', ['get', 'id'], id] });
-    if (f.length) showLake(f[0].properties as unknown as LakeProps, [lon, lat]);
+    if (f.length) return showLake(f[0].properties as unknown as LakeProps, [lon, lat]);
+    if (tries < 2 && zoom < 13) return goToLake(id, lon, lat, Math.min(13, zoom + 2), tries + 1);
+    hint.hidden = false;
+    hint.textContent = 'That lake did not load here. Zoom in a little and click it.';
   });
 }
 function applyHash() {
@@ -441,10 +544,10 @@ input.addEventListener('input', async () => {
     const li = el('li'); li.setAttribute('role', 'option'); li.id = `hit-${i}`;
     if (r.kind === 'lake') {
       const sw = el('span', 'sw'); sw.style.background = TIERS[r.tier as 1 | 2 | 3].color;
-      li.append(sw, el('span', 'hn', r.name), el('span', 'ha', [r.country, areaWords(r.area)].filter(Boolean).join(', ')));
+      li.append(sw, el('span', 'hn', r.name), el('span', 'ha', [r.main, r.country, areaWords(r.area)].filter(Boolean).join(', ')));
       li.addEventListener('mousedown', (e) => { e.preventDefault(); hits.hidden = true; input.blur(); goToLake(r.id, r.lon, r.lat, zoomFor(r.area)); });
     } else {
-      li.append(el('span', 'sw riv'), el('span', 'hn', r.name), el('span', 'ha', `${fmt(r.km)} km${r.to ? `, into ${seaName(r.to)}` : ' river'}`));
+      li.append(el('span', 'sw riv'), el('span', 'hn', r.name), el('span', 'ha', `${r.main ? `${r.main}, ` : ''}${fmt(r.km)} km${r.to ? `, into ${seaName(r.to)}` : ' river'}`));
       li.addEventListener('mousedown', (e) => { e.preventDefault(); hits.hidden = true; input.blur(); history.replaceState(null, '', `#r=${r.id}`); openRiver(r.id, null, true); });
     }
     hits.append(li);
@@ -466,6 +569,11 @@ input.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { hits.hidden = true; input.blur(); }
 });
 input.addEventListener('blur', () => setTimeout(() => { hits.hidden = true; }, 150));
+// "/" or Cmd/Ctrl+K jumps to the search box from anywhere (not while typing elsewhere)
+document.addEventListener('keydown', (e) => {
+  const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
+  if ((e.key === '/' && !typing) || (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey))) { e.preventDefault(); input.focus(); input.select(); }
+});
 const zoomFor = (km2: number) => Math.max(3, Math.min(12, 10.5 - Math.log2(Math.max(km2, 0.1)) / 2));
 
 // ---------- about ----------

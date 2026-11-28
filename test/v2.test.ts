@@ -62,3 +62,10 @@ describe('water over time', () => {
     expect(volumeLabel(12.34)).toBe('12 million m³');
   });
 });
+
+describe('the Caspian', () => {
+  it('is said to have no outlet, for lakes and rivers that end in it', () => {
+    expect(flowSentence({ p: [], km: 3000, endo: 0, sea: 'Caspian Sea' })).toBe('Its water flows about 3,000 km down rivers to the Caspian Sea, a lake with no outlet: the water never reaches the ocean.');
+    expect(flowSentence({ p: [], km: 300, endo: 0, sea: 'Black Sea' })).toBe('Its water flows about 300 km down rivers to the Black Sea.');
+  });
+});

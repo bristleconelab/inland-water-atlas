@@ -1,6 +1,6 @@
 // Named rivers (pipeline/build_rivers.py) and the water level SWOT measured along them. Pure parts are tested in
 // test/river.test.ts; fetching is kept small and cached.
-import { decodePath, seaName } from './v2';
+import { decodePath, landlocked, seaName } from './v2';
 
 export interface River {
   n: string; l?: string; km: number; q: number; up: number; g: number[][];
@@ -23,7 +23,7 @@ export function riverEnd(r: River): string {
   const on = r.dkm != null && r.dkm >= 5 ? `about ${n0(r.dkm)} km further on` : '';
   const goal = r.endo
     ? (r.sinkName ? `${r.sinkName}, in a basin with no outlet` : 'a basin with no outlet, where it evaporates or soaks away')
-    : r.sea ? seaName(r.sea) : null;
+    : r.sea ? seaName(r.sea) + landlocked(r.sea) : null;
   if (r.into && r.intoName) {
     if (!goal) return `It flows into ${theRiver(r.intoName)}. The river map ends before the water reaches the sea.`;
     return `It flows into ${theRiver(r.intoName)}, and its water ${r.endo ? 'never reaches the sea: it ends in' : 'reaches'} ${goal}${on ? `, ${on}` : ''}.`;
@@ -38,7 +38,7 @@ export function riverFacts(r: River): Fact[] {
     { kind: 'model', title: 'Length', text: r.fromName
       ? `About ${n0(r.km)} km long, measured along HydroRIVERS, a river network traced from elevation data. Above that it is called ${theRiver(r.fromName)}.`
       : `About ${n0(r.km)} km from its farthest source to its end, measured along HydroRIVERS, a river network traced from elevation data.` },
-    { kind: 'model', title: 'Flow', text: `About ${n0(r.q)} m³ of water a second where it ends, on average for 1971–2000. This is from a hydrological model (WaterGAP, in HydroRIVERS), not a gauge, and it does not take out the water that dams and irrigation use: on rivers such as the Amu Darya far less arrives today.` },
+    { kind: 'model', title: 'Flow', text: `About ${n0(r.q)} m³ of water a second where it ends, on average for 1971–2000. This is from a hydrological model (WaterGAP, in HydroRIVERS), not a gauge: the natural flow, before dams and irrigation take their share.` },
     { kind: 'model', title: 'Basin', text: `It gathers water from ${n0(r.up)} km².` },
   ];
   const seen: string[] = [];
@@ -52,7 +52,8 @@ export function riverFacts(r: River): Fact[] {
 }
 
 // ---------- SWOT water level (PO.DAAC Hydrocron) ----------
-export interface Level { t: number; h: number; u?: number }
+/** One SWOT pass: time, water surface elevation (m above EGM2008) and its uncertainty, river width (m), water-surface slope (m/m). */
+export interface Level { t: number; h: number; u?: number; w?: number; s?: number }
 const HYDROCRON = 'https://soto.podaac.earthdatacloud.nasa.gov/hydrocron/v1/timeseries';
 
 /** Hydrocron CSV -> good measurements, oldest first. Keeps quality 0 (good) and 1 (suspect), drops fill values,
@@ -64,7 +65,8 @@ export function parseLevels(csv: string): Level[] {
   if (!head) return [];
   const c = head.split(',');
   const col = (n: string) => c.indexOf(n);
-  const it = col('time_str'), ih = col('wse'), iq = col('reach_q'), iu = col('wse_u'), ii = col('ice_clim_f');
+  const it = col('time_str'), ih = col('wse'), iq = col('reach_q'), iu = col('wse_u'), ii = col('ice_clim_f'), iw = col('width'), is_ = col('slope');
+  const val = (f: string[], i: number) => { const x = i >= 0 ? Number(f[i]) : NaN; return Number.isFinite(x) && x > -1e9 ? x : undefined; }; // -999999999999 is SWOT's fill value
   if (it < 0 || ih < 0) return [];
   const pts: Level[] = [];
   for (const row of rows) {
@@ -73,7 +75,8 @@ export function parseLevels(csv: string): Level[] {
     const q = iq >= 0 ? Number(f[iq]) : 0, u = iu >= 0 ? Number(f[iu]) : 0, ice = ii >= 0 ? Number(f[ii]) : 0;
     if (!Number.isFinite(t) || !Number.isFinite(h) || h < -1000 || h > 9000 || q > 1) continue;
     if (ice >= 2 || (Number.isFinite(u) && u > 1)) continue; // a negative wse_u is a fill value: uncertainty unknown
-    pts.push({ t, h, u: Number.isFinite(u) && u > 0 ? u : undefined });
+    const w = val(f, iw), sl = val(f, is_);
+    pts.push({ t, h, u: Number.isFinite(u) && u > 0 ? u : undefined, w: w != null && w > 0 ? w : undefined, s: sl });
   }
   if (pts.length < 3) return pts.sort((a, b) => a.t - b.t);
   const med = median(pts.map((p) => p.h));
@@ -94,7 +97,13 @@ export function levelSummary(pts: Level[]): string | null {
   if (pts.length < 5) return null;
   const hs = pts.map((p) => p.h);
   const range = quantile(hs, 0.9) - quantile(hs, 0.1);
-  return `Measured ${pts.length} times from ${month(pts[0].t)} to ${month(pts[pts.length - 1].t)}. The water level here typically moved over ${range < 1 ? range.toFixed(2) : range.toFixed(1)} m (between its 10th and 90th percentiles), around ${n0(median(hs))} m above the geoid (EGM2008, roughly sea level).`;
+  return `Measured ${pts.length} times from ${month(pts[0].t)} to ${month(pts[pts.length - 1].t)}. The water level here typically moved over ${range < 1 ? range.toFixed(2) : range.toFixed(1)} m (between its 10th and 90th percentiles), around ${n0(median(hs))} m above the geoid (EGM2008, roughly sea level).${widthWords(pts)}`;
+}
+function widthWords(pts: Level[]): string {
+  const ws = pts.map((p) => p.w).filter((w): w is number => w != null);
+  if (ws.length < 5) return '';
+  const lo = quantile(ws, 0.1), hi = quantile(ws, 0.9);
+  return ` Its width seen by SWOT: ${n0(median(ws))} m, ${n0(lo)} to ${n0(hi)} m.`;
 }
 
 /** Dots joined by a thin line, placed by date, with the height scale on the left; hovering a dot shows its date and
@@ -119,7 +128,7 @@ export function swotLevels(reach: number): Promise<Level[] | null> {
   let p = levelCache.get(reach);
   if (!p) {
     const end = new Date().toISOString().slice(0, 19) + 'Z';
-    const url = `${HYDROCRON}?feature=Reach&feature_id=${reach}&start_time=2023-07-01T00:00:00Z&end_time=${end}&output=csv&fields=reach_id,time_str,wse,wse_u,reach_q,ice_clim_f`;
+    const url = `${HYDROCRON}?feature=Reach&feature_id=${reach}&start_time=2023-07-01T00:00:00Z&end_time=${end}&output=csv&fields=reach_id,time_str,wse,wse_u,reach_q,ice_clim_f,width,slope`;
     p = fetch(url).then((r) => (r.ok ? r.json() : null)).then((j) => (j?.results?.csv ? parseLevels(j.results.csv) : [])).catch(() => null);
     levelCache.set(reach, p);
   }

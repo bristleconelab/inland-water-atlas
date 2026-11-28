@@ -95,3 +95,29 @@ At the Rhône stretch near Avignon (SWORD reach 21602100081) the filtered passes
 move over 0.52 m between their 10th and 90th percentiles. SWORD's own per-stretch level range for the Rhône's
 stretches has a median of 6.7 m; it includes passes of poor quality, and is therefore not shown. The filter keeps a
 synthetic 4 m flood on a still river (MAD 0.05 m) and drops a 21 m bridge echo (`test/river.test.ts`).
+
+## Basins with no outlet
+
+The first build of the "no way to the sea" view (HydroBASINS `ENDO` only) left out the Caspian: HydroSHEDS maps it
+as ocean. `pipeline/test_outputs.py` checks that the Caspian, Titicaca, Issyk-Kul, Balkhash and the Great Salt Lake are
+in the list and Baikal and Ladoga are not; adding the 217 main basins whose outlet touches the Caspian raised the count
+from 38,698 to 48,818 lakes.
+
+## River profiles
+
+All 6,931 profiles end within 10 % of their river's length (the first build climbed past where a river's name starts:
+the Amu Darya's ran up the Panj to 2,332 km against its 1,233). Start and end heights: Amu Darya 315 m at the
+Panj-Vakhsh confluence to 73 m, Volga 238 m to -29 m (the Caspian is below sea level), Syr Darya 396 m to 40 m.
+Degree of regulation at the end: Syr Darya 312 %, Nile 281 %, Volga 77 %, Amu Darya 27 %, Danube 10 %.
+
+## Shares of what is published
+
+Lakes with a published depth or volume are 1.0 % of all lakes, 57.8 % of the lake area and 94.6 % of the water
+volume in HydroLAKES (91.0 % without the Caspian).
+
+## Data-quality checks
+
+`pipeline/test_outputs.py` (17 checks) runs on the published shards before the tile site is deployed: no negative or
+part-year water, no lake or river ending in a "sea" named like a river, the lengths of nine big rivers within 10 % of
+the table above, trend and water records aligned, physical ranges for the lake numbers and profiles, the stats adding
+up, the search indexes aligned.

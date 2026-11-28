@@ -23,8 +23,11 @@ export function flowSentence(f: Flow, lakeName?: string): string {
     return `Its water never reaches the sea: it flows ${km} into a basin with no outlet, where it evaporates or soaks away.`;
   }
   if (!f.sea) return f.km < 1 ? 'No mapped river leaves this lake, so where its water goes is not known from these data.' : `Its water flows ${km} down rivers, to where the river map (HydroRIVERS) ends without reaching the sea.`;
-  return `Its water flows ${km} down rivers to ${seaName(f.sea)}.`;
+  return `Its water flows ${km} down rivers to ${seaName(f.sea)}${landlocked(f.sea)}.`;
 }
+
+/** The Caspian is a sea by name, a lake with no outlet in fact (HydroSHEDS maps it as ocean). */
+export const landlocked = (sea?: string | null) => (sea && /caspian/i.test(sea) ? ', a lake with no outlet: the water never reaches the ocean' : '');
 
 /** Natural Earth names are in capitals for oceans ("ARCTIC OCEAN") and title case for seas. */
 export function seaName(s: string): string {

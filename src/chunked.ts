@@ -1,7 +1,7 @@
 // A PMTiles archive cut into fixed-size pieces served as plain static files (Cloudflare Pages: no HTTP range
 // requests, 25 MiB per file, 20,000 files). getBytes(offset, length) fetches the pieces that cover the range and
 // joins them. PMTiles keeps tiles in Hilbert order, so neighbouring tiles share pieces and a small piece cache
-// serves most reads. Written by scripts/split_pmtiles.mjs; the manifest format is in docs/data-contract.md.
+// serves most reads. Written by pipeline/split_pmtiles.mjs; the manifest format is in docs/data-contract.md.
 import type { RangeResponse, Source } from 'pmtiles';
 
 export interface ChunkedArchive {

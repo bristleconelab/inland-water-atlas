@@ -88,3 +88,33 @@ export function trendWords(t: Trend, first: number, last: number): string {
     return `No clear trend over ${span} (Mann-Kendall ${pv}; Theil-Sen ${pct(t.slope) >= 0 ? '+' : '−'}${f(pct(t.slope))} a decade, 95 % from ${pct(t.lo) >= 0 ? '+' : '−'}${f(pct(t.lo))} to ${pct(t.hi) >= 0 ? '+' : '−'}${f(pct(t.hi))}).`;
   return `${t.slope < 0 ? 'Falling' : 'Rising'} by about ${f(pct(t.slope))} of its usual volume a decade over ${span} (95 %: ${f(pct(t.lo))} to ${f(pct(t.hi))}; Mann-Kendall ${pv}, corrected for year-to-year carry-over).`;
 }
+
+export interface Step { year: number; before: number; after: number; p: number; n: number }
+
+/** Pettitt (1979) test for one change in the median: K = max |U_t|, p ≈ 2 exp(-6K² / (n³ + n²)). `year` is the first
+ *  year after the change (a reservoir filling, a dam upstream). Null below `min` years or when p >= `alpha`. */
+export function pettitt(y0: number, v: (number | null)[], min = 10, alpha = 0.05): Step | null {
+  const xs: number[] = [], ys: number[] = [];
+  v.forEach((val, i) => { if (val != null && Number.isFinite(val)) { xs.push(y0 + i); ys.push(val); } });
+  const n = ys.length;
+  if (n < min) return null;
+  let U = 0, K = 0, at = -1;
+  // U_t = sum_{i<=t} sum_{j>t} sgn(y_j - y_i), built incrementally: U_t = U_{t-1} + sum_j sgn(y_j - y_t) over all j
+  U = 0;
+  for (let t = 0; t < n - 1; t++) {
+    let s = 0;
+    for (let j = 0; j < n; j++) s += Math.sign(ys[j] - ys[t]);
+    U += s;
+    if (Math.abs(U) > K) { K = Math.abs(U); at = t; }
+  }
+  const p = Math.min(1, 2 * Math.exp((-6 * K * K) / (n ** 3 + n ** 2)));
+  if (at < 0 || p >= alpha) return null;
+  return { year: xs[at + 1], before: median(ys.slice(0, at + 1)), after: median(ys.slice(at + 1)), p, n };
+}
+
+/** The step in words (volumes in million m3, as in GloLakes). */
+export function stepWords(s: Step): string {
+  const v = (x: number) => (x >= 1000 ? `${(x / 1000).toFixed(x >= 10000 ? 0 : 1)} km³` : `${x.toFixed(x >= 10 ? 0 : 1)} million m³`);
+  const pv = s.p < 0.001 ? 'p < 0.001' : `p = ${s.p.toFixed(3)}`;
+  return `The largest shift in its median came in ${s.year}: ${v(s.before)} before and ${v(s.after)} from then on (Pettitt test, ${pv}). A steady trend also shows up this way; a single jump often means a dam filled or water was diverted.`;
+}

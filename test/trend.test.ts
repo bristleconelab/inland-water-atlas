@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normCdf, trend, trendWords } from '../src/trend';
+import { normCdf, trend, trendWords, pettitt } from '../src/trend';
 
 describe('trend statistics', () => {
   it('has a correct normal CDF', () => {
@@ -33,5 +33,24 @@ describe('trend statistics', () => {
   it('needs ten years', () => {
     expect(trend(2000, [1, 2, 3, 4, 5, 6, 7, 8, 9])).toBeNull();
     expect(trend(2000, [1, null, 3, 4, 5, 6, 7, 8, 9, 10, 11])).not.toBeNull();
+  });
+});
+
+describe('pettitt', () => {
+  it('finds a reservoir filling and matches the textbook double sum (K = 49, p = 0.01489)', () => {
+    const s = pettitt(2000, [10, 11, 9, 10, 12, 11, 10, 30, 31, 29, 32, 30, 31, 33]);
+    expect(s).not.toBeNull();
+    expect(s!.year).toBe(2007);
+    expect(s!.p).toBeCloseTo(0.014893, 5);
+    expect(s!.before).toBe(10);
+    expect(s!.after).toBe(31);
+  });
+  it('stays quiet on noise and on short records', () => {
+    expect(pettitt(2000, [5, 6, 5, 7, 6, 5, 6, 7, 5, 6, 6, 5])).toBeNull();
+    expect(pettitt(2000, [1, 1, 1, 9, 9, 9])).toBeNull();
+  });
+  it('skips missing years', () => {
+    const s = pettitt(2000, [10, null, 11, 9, 10, 12, 11, 10, 30, 31, 29, 32, 30, 31, 33]);
+    expect(s!.year).toBe(2008);
   });
 });
